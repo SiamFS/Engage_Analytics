@@ -9,14 +9,24 @@ from django.db import migrations, models
 
 def backfill_video_uuids(apps, schema_editor):
     Video = apps.get_model('api', 'Video')
-    for video in Video.objects.filter(uuid__isnull=True):
-        video.uuid = uuid.uuid4()
+    seen = set()
+    for video in Video.objects.all().order_by('id'):
+        if video.uuid is None or video.uuid in seen:
+            video.uuid = uuid.uuid4()
+        while video.uuid in seen:
+            video.uuid = uuid.uuid4()
+        seen.add(video.uuid)
         video.save(update_fields=['uuid'])
 
 def backfill_webcamrecording_uuids(apps, schema_editor):
     WebcamRecording = apps.get_model('api', 'WebcamRecording')
-    for rec in WebcamRecording.objects.filter(uuid__isnull=True):
-        rec.uuid = uuid.uuid4()
+    seen = set()
+    for rec in WebcamRecording.objects.all().order_by('id'):
+        if rec.uuid is None or rec.uuid in seen:
+            rec.uuid = uuid.uuid4()
+        while rec.uuid in seen:
+            rec.uuid = uuid.uuid4()
+        seen.add(rec.uuid)
         rec.save(update_fields=['uuid'])
 
 
@@ -39,12 +49,12 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='video',
             name='uuid',
-            field=models.UUIDField(db_index=True, default=uuid.uuid4, editable=False, null=True, unique=True),
+            field=models.UUIDField(db_index=True, editable=False, null=True, unique=True),
         ),
         migrations.AddField(
             model_name='webcamrecording',
             name='uuid',
-            field=models.UUIDField(db_index=True, default=uuid.uuid4, editable=False, null=True, unique=True),
+            field=models.UUIDField(db_index=True, editable=False, null=True, unique=True),
         ),
         migrations.AlterField(
             model_name='emotionframe',
