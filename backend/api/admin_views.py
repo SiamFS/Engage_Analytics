@@ -459,15 +459,16 @@ class AdminUserManagementView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        from firebase_admin import auth as firebase_auth
-
         try:
+            from firebase_admin import auth as firebase_auth
             fb_user = firebase_auth.create_user(
                 email=serializer.validated_data.get("email"),
                 password=serializer.validated_data.get("password") or "",
                 display_name=f"{serializer.validated_data.get('first_name', '')} {serializer.validated_data.get('last_name', '')}".strip(),
             )
             serializer.validated_data["firebase_uid"] = fb_user.uid
+        except (ImportError, ValueError) as e:
+            logger.warning(f"Firebase user creation skipped: {e}")
         except Exception as e:
             logger.error(f"Failed to create Firebase user: {e}")
             return Response(
@@ -517,6 +518,14 @@ class AdminUserDetailView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         serializer.save()
+
+        if "role" in update_data:
+            try:
+                from firebase_admin import firestore as _fs
+                _fs.client().collection('users').document(user.firebase_uid).update({'role': update_data["role"]})
+            except Exception:
+                logger.warning(f"Failed to sync role to Firestore for user {user.id}")
+
         return Response(serializer.data)
 
     def delete(self, request, user_id):
