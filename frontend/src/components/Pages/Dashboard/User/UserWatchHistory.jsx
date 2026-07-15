@@ -24,7 +24,7 @@ const UserWatchHistory = () => {
       setLoading(true);
       setError(null);
       
-      const historyData = await VideoService.getUserHistory().then(data => data);
+      const historyData = await VideoService.getUserHistory();
       const publicVideos = historyData.filter(video => video.visibility === 'public');
       setWatchHistory(publicVideos);
     } catch (err) {

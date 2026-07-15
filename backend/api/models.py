@@ -7,7 +7,7 @@ from django.contrib.auth.models import (
     PermissionsMixin,
 )
 from django.utils import timezone
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db.models import Q, F, FloatField, ExpressionWrapper, Count
 
 
@@ -451,13 +451,13 @@ class EmotionFrame(models.Model):
     )
     viewer = models.ForeignKey(User, on_delete=models.CASCADE, related_name="emotion_frame_viewer")
     t_seconds = models.FloatField()
-    angry = models.FloatField(default=0.0)
-    disgust = models.FloatField(default=0.0)
-    fear = models.FloatField(default=0.0)
-    happy = models.FloatField(default=0.0)
-    neutral = models.FloatField(default=0.0)
-    sad = models.FloatField(default=0.0)
-    surprise = models.FloatField(default=0.0)
+    angry = models.FloatField(default=0.0, validators=[MinValueValidator(0.0), MaxValueValidator(1.0)])
+    disgust = models.FloatField(default=0.0, validators=[MinValueValidator(0.0), MaxValueValidator(1.0)])
+    fear = models.FloatField(default=0.0, validators=[MinValueValidator(0.0), MaxValueValidator(1.0)])
+    happy = models.FloatField(default=0.0, validators=[MinValueValidator(0.0), MaxValueValidator(1.0)])
+    neutral = models.FloatField(default=0.0, validators=[MinValueValidator(0.0), MaxValueValidator(1.0)])
+    sad = models.FloatField(default=0.0, validators=[MinValueValidator(0.0), MaxValueValidator(1.0)])
+    surprise = models.FloatField(default=0.0, validators=[MinValueValidator(0.0), MaxValueValidator(1.0)])
     dominant = models.CharField(max_length=20)
     confidence = models.FloatField(default=0.0)
     created_at = models.DateTimeField(auto_now_add=True)

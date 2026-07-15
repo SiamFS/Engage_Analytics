@@ -1,3 +1,4 @@
+from django.db import IntegrityError
 from django.db.models import F
 from django.shortcuts import get_object_or_404
 
@@ -20,15 +21,18 @@ class VideoLikeService:
         """
         if not user or not user.is_authenticated:
             return None, False, 0
-            
+
         video = get_object_or_404(Video, id=video_id)
-        like, created = VideoLike.objects.get_or_create(video=video, user=user)
-        
+
+        try:
+            like, created = VideoLike.objects.get_or_create(video=video, user=user)
+        except IntegrityError:
+            like = VideoLike.objects.get(video=video, user=user)
+            created = False
+
         if created:
-            # User liked the video
             return cls.add_like(video, like)
         else:
-            # User unliked the video
             return cls.remove_like(video, like)
     
     @staticmethod

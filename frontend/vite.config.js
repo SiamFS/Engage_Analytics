@@ -10,7 +10,11 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: 'dist', 
+    outDir: 'dist',
+    minify: 'esbuild',
+    esbuild: {
+      drop: ['console', 'debugger'],
+    },
   },
   server: {
     port: 3000, 

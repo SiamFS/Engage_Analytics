@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import NavigationBar from './components/Shared/Navbar/Navbar';
 import MainFooter from './components/Shared/Footer/Footer';
 import ScrollToTop from './components/Shared/ScrollToTop/ScrollToTop';
+import ErrorBoundary from './components/common/ErrorBoundary/ErrorBoundary';
 
 
 const AUTH_ROUTES = ['/login', '/signup', '/forgetpassword'];
@@ -22,7 +23,9 @@ function App() {
 
       {/* Main content */}
       <main className={`${!isAuthPage ? 'pt-16' : ''}`}>
-        <Outlet /> 
+        <ErrorBoundary>
+          <Outlet />
+        </ErrorBoundary>
       </main>
       
       {/* footer */}

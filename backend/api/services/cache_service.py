@@ -89,6 +89,13 @@ class CacheService:
         cls.invalidate("trending")
 
     @classmethod
+    def invalidate_video_lists(cls):
+        cls.invalidate("feed")
+        cls.invalidate("featured")
+        cls.invalidate("trending")
+        cls.invalidate("recs")
+
+    @classmethod
     def invalidate_recommendations(cls, user_id=None):
         if user_id:
             key_prefix = f"recs:u{user_id}"

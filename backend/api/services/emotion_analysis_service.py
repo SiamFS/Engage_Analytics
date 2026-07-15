@@ -137,7 +137,7 @@ class EmotionAnalysisService:
                     confidence=emotions[dominant],
                 )
             )
-        EmotionFrame.objects.bulk_create(to_create)
+        EmotionFrame.objects.bulk_create(to_create, batch_size=100)
 
         WebcamUploadService.generate_thumbnail(recording.id, video_bytes)
 

@@ -45,7 +45,7 @@ class AzureStorageService:
             filename,
             creds["account_key"],
             upload_permission,
-            1,
+            settings.AZURE_SAS_UPLOAD_EXPIRY_HOURS,
         )
         video_view_url = cls.generate_sas_url(
             creds["account_name"],
@@ -53,7 +53,7 @@ class AzureStorageService:
             filename,
             creds["account_key"],
             view_permission,
-            24 * 60,
+            settings.AZURE_SAS_VIEW_EXPIRY_HOURS,
         )
         return video_upload_url, video_view_url
 
@@ -70,7 +70,7 @@ class AzureStorageService:
             thumbnail_name,
             creds["account_key"],
             upload_permission,
-            1,
+            settings.AZURE_SAS_UPLOAD_EXPIRY_HOURS,
         )
         thumbnail_view_url = cls.generate_sas_url(
             creds["account_name"],
@@ -78,7 +78,7 @@ class AzureStorageService:
             thumbnail_name,
             creds["account_key"],
             view_permission,
-            24 * 60,
+            settings.AZURE_SAS_VIEW_EXPIRY_HOURS,
         )
         return thumbnail_upload_url, thumbnail_view_url
 
@@ -94,7 +94,7 @@ class AzureStorageService:
             filename,
             creds["account_key"],
             upload_permission,
-            1,
+            settings.AZURE_SAS_UPLOAD_EXPIRY_HOURS,
         )
         emotion_view_url = cls.generate_sas_url(
             creds["account_name"],
@@ -102,7 +102,7 @@ class AzureStorageService:
             filename,
             creds["account_key"],
             view_permission,
-            24 * 60,
+            settings.AZURE_SAS_VIEW_EXPIRY_HOURS,
         )
         return emotion_upload_url, emotion_view_url
 

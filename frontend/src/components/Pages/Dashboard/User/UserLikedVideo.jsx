@@ -24,7 +24,7 @@ const UserLikedVideo = () => {
       setLoading(true);
       setError(null);
       
-      const videos = await Promise.resolve(VideoService.getUserLikedVideos());
+      const videos = await VideoService.getUserLikedVideos();
       const publicVideos = videos.filter(video => video.visibility === 'public');
       setLikedVideos(publicVideos);
     } catch (err) {

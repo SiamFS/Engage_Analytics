@@ -501,10 +501,7 @@ const useProfileActions = (user, formState, setLastUpdateTime, showToast, resetD
       
       showToast('Profile updated successfully!');
       resetDataFetchFlag();
-      
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
+      fetchUserData();
       
     } catch (error) {
       console.error('Error updating profile:', error);

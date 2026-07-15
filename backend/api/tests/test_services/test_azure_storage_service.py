@@ -109,7 +109,7 @@ class TestAzureStorageService:
         view_call = mock_generate_sas_url.call_args_list[1]
         view_permission = view_call[0][4]
         assert view_permission.read
-        assert view_call[0][5] == 24 * 60                 # expiry_hours (24*60 hours for viewing)
+        assert view_call[0][5] == 48                       # expiry_hours (48 hours for viewing)
 
     @patch('api.services.azure_storage_service.AzureStorageService.generate_sas_url')
     def test_get_thumbnail_urls(self, mock_generate_sas_url, mock_settings):

@@ -11,18 +11,28 @@ load_dotenv()
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
+try:
+    import sentry_sdk
+except ImportError:
+    sentry_sdk = None
+
 SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    from django.core.exceptions import ImproperlyConfigured
+    raise ImproperlyConfigured("SECRET_KEY environment variable is required")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG =os.getenv("DEBUG", "False").lower() == "true"
+DEBUG = os.getenv("DEBUG", "False").lower() == "true"
 ENVIRONMENT = os.getenv("ENVIRONMENT")
 
 if ENVIRONMENT == 'PROD':
-    # Reads comma-separated allowed hosts from environment variable
+    if DEBUG:
+        raise ValueError("DEBUG must be False in production")
     allowed_hosts_str = os.getenv('ALLOWED_HOSTS')
     ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_str.split(',')]
 else:
-    ALLOWED_HOSTS = ["*"]  # Allow all hosts in development
+    ALLOWED_HOSTS = ["*"]
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -35,14 +45,17 @@ INSTALLED_APPS = [
     "api",
     "rest_framework",
     "corsheaders",
-    "django_extensions", # Can remove this for PRODUCTION
-    "django_crontab", 
+    "django_crontab",
 ]
+
+if ENVIRONMENT != 'PROD':
+    INSTALLED_APPS += ["django_extensions"]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
-    "corsheaders.middleware.CorsMiddleware",  
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -75,7 +88,6 @@ WSGI_APPLICATION = "backend.wsgi.application"
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
 if ENVIRONMENT == 'PROD':
-    # Production Database
     tmpPostgres = urlparse(os.getenv("DATABASE_URL"))
     DATABASES = {
         'default': {
@@ -85,6 +97,11 @@ if ENVIRONMENT == 'PROD':
             'PASSWORD': tmpPostgres.password,
             'HOST': tmpPostgres.hostname,
             'PORT': 5432,
+            'CONN_MAX_AGE': 300,
+            'OPTIONS': {
+                'sslmode': 'require',
+                'connect_timeout': 10,
+            },
         }
     }
 elif ENVIRONMENT == 'TEST':
@@ -142,6 +159,12 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STORAGES = {
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
@@ -154,8 +177,23 @@ if ENVIRONMENT == 'PROD':
     cors_origins_str = os.getenv('CORS_ALLOWED_ORIGINS', '')
     if cors_origins_str:
         CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_origins_str.split(',')]
+
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    CSRF_COOKIE_SECURE = True
+    CSRF_COOKIE_HTTPONLY = True
+    CSRF_COOKIE_SAMESITE = 'Lax'
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_REFERRER_POLICY = 'same-origin'
 else:
-    CORS_ALLOW_ALL_ORIGINS = True  # Development only
+    CORS_ALLOW_ALL_ORIGINS = True
     CORS_ALLOW_CREDENTIALS = True
 
 
@@ -178,7 +216,15 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
-    ]
+    ],
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '20/minute',
+        'user': '200/minute',
+    },
 }
 
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
@@ -210,6 +256,20 @@ AZURE_VIDEO_CONTAINER_NAME = os.getenv('AZURE_VIDEO_CONTAINER_NAME')
 AZURE_THUMBNAIL_CONTAINER_NAME = os.getenv('AZURE_THUMBNAIL_CONTAINER_NAME')
 AZURE_WEBCAM_CONTAINER_NAME = os.getenv('AZURE_WEBCAM_CONTAINER_NAME')
 
+# Azure SAS token expiry (hours)
+if sentry_sdk and ENVIRONMENT == 'PROD' and os.getenv('SENTRY_DSN'):
+    sentry_sdk.init(
+        dsn=os.getenv('SENTRY_DSN'),
+        traces_sample_rate=0.1,
+        send_default_pii=False,
+    )
+
+AZURE_SAS_UPLOAD_EXPIRY_HOURS = 1
+AZURE_SAS_VIEW_EXPIRY_HOURS = 48
+
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
+
 # Emotion analysis (Hugging Face serverless inference)
 HF_API_TOKEN = os.getenv('HF_API_TOKEN')
 HF_EMOTION_MODEL = os.getenv('HF_EMOTION_MODEL', 'mo-thecreator/vit-Facial-Expression-Recognition')
@@ -218,36 +278,59 @@ ANALYSIS_MAX_FRAMES = int(os.getenv('ANALYSIS_MAX_FRAMES', '600'))
 
 
 # Logging configuration
-LOG_DIR = BASE_DIR / 'logs'
-if not LOG_DIR.exists():
-    os.makedirs(LOG_DIR)
+if ENVIRONMENT == 'PROD':
+    LOGGING = {
+        'version': 1,
+        'disable_existing_loggers': False,
+        'formatters': {
+            'verbose': {
+                'format': '[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s',
+                'datefmt': '%Y-%m-%d %H:%M:%S'
+            },
+        },
+        'handlers': {
+            'console': {
+                'level': 'INFO',
+                'class': 'logging.StreamHandler',
+                'formatter': 'verbose',
+            },
+        },
+        'root': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+    }
+else:
+    LOG_DIR = BASE_DIR / 'logs'
+    if not LOG_DIR.exists():
+        os.makedirs(LOG_DIR)
 
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': '[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s',
-            'datefmt': '%Y-%m-%d %H:%M:%S'
+    LOGGING = {
+        'version': 1,
+        'disable_existing_loggers': False,
+        'formatters': {
+            'verbose': {
+                'format': '[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s',
+                'datefmt': '%Y-%m-%d %H:%M:%S'
+            },
         },
-    },
-    'handlers': {
-        'file': {
+        'handlers': {
+            'file': {
+                'level': 'INFO',
+                'class': 'logging.handlers.RotatingFileHandler',
+                'filename': str(LOG_DIR / 'application.log'),
+                'maxBytes': 1024 * 1024 * 10,
+                'backupCount': 5,
+                'formatter': 'verbose',
+            },
+            'console': {
+                'level': 'INFO',
+                'class': 'logging.StreamHandler',
+                'formatter': 'verbose',
+            },
+        },
+        'root': {
+            'handlers': ['file', 'console'],
             'level': 'INFO',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': str(LOG_DIR / 'application.log'),
-            'maxBytes': 1024 * 1024 * 10,
-            'backupCount': 5,
-            'formatter': 'verbose',
         },
-        'console': {
-            'level': 'INFO',
-            'class': 'logging.StreamHandler',
-            'formatter': 'verbose',
-        },
-    },
-    'root': {
-        'handlers': ['file', 'console'],
-        'level': 'INFO',
-    },
-}
+    }

@@ -138,14 +138,19 @@ class WebcamUploadService:
     @staticmethod
     def mark_upload_complete(recording_id: int, user: User) -> Optional[WebcamRecording]:
         """Marks a webcam recording's blob upload as completed (sets upload_status)."""
+        from django.db import transaction
+
         try:
-            recording = WebcamRecording.objects.get(id=recording_id, recorder=user)
+            with transaction.atomic():
+                recording = (
+                    WebcamRecording.objects.select_for_update()
+                    .get(id=recording_id, recorder=user)
+                )
+                recording.upload_status = "completed"
+                recording.upload_completed_at = timezone.now()
+                recording.save(update_fields=["upload_status", "upload_completed_at"])
         except WebcamRecording.DoesNotExist:
             return None
-
-        recording.upload_status = "completed"
-        recording.upload_completed_at = timezone.now()
-        recording.save(update_fields=["upload_status", "upload_completed_at"])
 
         WebcamUploadService._trigger_thumbnail_async(recording_id)
 

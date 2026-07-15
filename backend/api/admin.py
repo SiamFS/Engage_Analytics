@@ -13,7 +13,7 @@ from api.models import (
     VideoShare,
     WebcamRecording,
 )
-from api.utils import should_make_private, make_video_private
+from api.services.video_view_service import VideoViewService
 
 
 class CompanyProfileInline(admin.StackedInline):
@@ -127,8 +127,8 @@ class VideoAdmin(admin.ModelAdmin):
     def check_privacy_limits(self, request, queryset):
         count = 0
         for video in queryset:
-            if should_make_private(video):
-                make_video_private(video)
+            if VideoViewService.should_make_private(video):
+                VideoViewService.make_video_private(video)
                 count += 1
         self.message_user(request, f"{count} videos were made private due to limits.")
 

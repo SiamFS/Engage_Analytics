@@ -1,11 +1,18 @@
 import logging
 from rest_framework import authentication
 from rest_framework import exceptions
-from firebase_admin import auth, firestore
+from firebase_admin import auth
 from api.models import User
 
 logger = logging.getLogger(__name__)
-db = firestore.client()
+
+
+def get_firestore_client():
+    from firebase_admin import firestore as _fs
+    try:
+        return _fs.client()
+    except Exception:
+        return None
 
 class FirebaseAuthentication(authentication.BaseAuthentication):
     def authenticate(self, request):
@@ -43,8 +50,17 @@ class FirebaseAuthentication(authentication.BaseAuthentication):
         return decoded_token["uid"]
     
     def _get_user_data(self, uid):
+        _db = get_firestore_client()
+        if not _db:
+            firebase_user = auth.get_user(uid)
+            return {
+                'first_name': '',
+                'last_name': '',
+                'email': firebase_user.email,
+                'role': 'user'
+            }
 
-        user_ref = db.collection('users').document(uid)
+        user_ref = _db.collection('users').document(uid)
         user_doc = user_ref.get()
         
         if user_doc.exists:

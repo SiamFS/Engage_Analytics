@@ -333,20 +333,20 @@ class VideoAdminTest(AdminTestCase):
         new_count = VideoShare.objects.filter(video=self.video).count()
         self.assertEqual(new_count, initial_count + 1)
     
-    @patch('api.admin.should_make_private')
-    @patch('api.admin.make_video_private')
+    @patch('api.admin.VideoViewService.should_make_private')
+    @patch('api.admin.VideoViewService.make_video_private')
     def test_check_privacy_limits(self, mock_make_private, mock_should_make_private):
         # Setup mocks
         mock_should_make_private.return_value = True
         mock_make_private.return_value = True
-        
+
         # Set up the admin action request
         request = self.create_request_with_messages()
-        
+
         # Execute the action
         queryset = Video.objects.filter(id=self.video.id)
         self.video_admin.check_privacy_limits(request, queryset)
-        
+
         # Verify mocks were called correctly
         mock_should_make_private.assert_called_once_with(self.video)
         mock_make_private.assert_called_once_with(self.video)

@@ -127,12 +127,12 @@ const EditVideo = () => {
         updateData.auto_private_after = null;
       }
       
-      await Promise.resolve(VideoService.adminEditVideo(id, updateData));
+      await VideoService.adminEditVideo(id, updateData);
       
       setSuccess('Video updated successfully');
       
       try {
-        const updatedVideo = await Promise.VideoService.getVideoDetails(id);
+        const updatedVideo = await VideoService.getVideoDetails(id);
         if (isMounted.current) {
           setVideo(updatedVideo);
         }

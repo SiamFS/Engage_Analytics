@@ -52,13 +52,7 @@ from api.services import (
     VideoShareService,
     EmotionAnalysisService,
 )
-from api.utils import (
-    increment_video_views,
-    record_user_view,
-    should_make_private,
-    make_video_private,
-    safe_int_param,
-)
+from api.utils import safe_int_param
 from api.permissions import IsAdmin, IsCompanyOrAdmin, IsCompanyOrAdminOrOwner
 from api.services.cache_service import CacheService
 
@@ -128,11 +122,9 @@ class VideoFeedView(generics.ListAPIView):
     permission_classes = [AllowAny]
 
     def get_queryset(self):
-        limit = safe_int_param(self.request, "limit", 0, 0, 100)
+        limit = safe_int_param(self.request, "limit", 50, 1, 100)
         offset = safe_int_param(self.request, "offset", 0, 0)
-        if limit:
-            return CacheService.cached_feed(limit, offset, lambda: Video._public_available_qs())
-        return Video._public_available_qs()
+        return CacheService.cached_feed(limit, offset, lambda: Video._public_available_qs())
 
 
 class VideoDetailView(generics.RetrieveAPIView):
@@ -258,10 +250,7 @@ class RecordVideoViewAPI(generics.CreateAPIView):
             )
 
         if privacy_changed:
-            CacheService.invalidate_feed()
-            CacheService.invalidate_features()
-            CacheService.invalidate_trending()
-            CacheService.invalidate_recommendations()
+            CacheService.invalidate_video_lists()
 
         return Response(
             {
@@ -291,10 +280,7 @@ class ToggleVideoLikeAPI(generics.CreateAPIView):
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
-        CacheService.invalidate_feed()
-        CacheService.invalidate_features()
-        CacheService.invalidate_trending()
-        CacheService.invalidate_recommendations()
+        CacheService.invalidate_video_lists()
 
         return Response(
             {
@@ -434,10 +420,7 @@ class UploadVideoView(generics.CreateAPIView):
                 serializer, self.request.user, video_view_url, thumbnail_view_url
             )
 
-            CacheService.invalidate_feed()
-            CacheService.invalidate_features()
-            CacheService.invalidate_trending()
-            CacheService.invalidate_recommendations()
+            CacheService.invalidate_video_lists()
 
             return Response(
                 {
@@ -773,23 +756,30 @@ class HealthCheckView(APIView):
 
     def get(self, request):
         from django.db import connection
+        from django.conf import settings
+
+        checks = {}
 
         try:
             with connection.cursor() as cursor:
                 cursor.execute("SELECT 1")
-                db_ok = cursor.fetchone() is not None
+                checks["db"] = cursor.fetchone() is not None
         except Exception:
-            db_ok = False
+            checks["db"] = False
 
         try:
             firebase_admin = __import__("firebase_admin", fromlist=["credential"])
-            firebase_ok = bool(firebase_admin._apps)
+            checks["firebase"] = bool(firebase_admin._apps)
         except Exception:
-            firebase_ok = False
+            checks["firebase"] = False
 
-        status_code = status.HTTP_200_OK if (db_ok and firebase_ok) else status.HTTP_503_SERVICE_UNAVAILABLE
-        return Response({
-            "status": "healthy" if (db_ok and firebase_ok) else "degraded",
-            "db": "ok" if db_ok else "error",
-            "firebase": "ok" if firebase_ok else "error",
-        }, status=status_code)
+        checks["azure"] = bool(settings.AZURE_STORAGE_ACCOUNT_NAME and settings.AZURE_STORAGE_ACCOUNT_KEY)
+        checks["huggingface"] = bool(settings.HF_API_TOKEN)
+
+        all_ok = all(checks.values())
+        status_code = status.HTTP_200_OK if all_ok else status.HTTP_503_SERVICE_UNAVAILABLE
+
+        response_data = {"status": "healthy" if all_ok else "degraded"}
+        response_data.update(checks)
+
+        return Response(response_data, status=status_code)
