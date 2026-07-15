@@ -15,6 +15,8 @@ from api.serializers import (
 )
 from api.permissions import IsAdmin
 from api.utils import safe_int_param
+from api.services.points_service import PointsService
+from api.services.notification_service import NotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +110,8 @@ class SubmitFeedbackView(generics.CreateAPIView):
             existing.responses = data.get("responses", {})
             existing.rating = data.get("rating")
             existing.is_anonymous = data.get("is_anonymous", False)
+            existing.is_bug_report = data.get("is_bug_report", False)
+            existing.consent_to_improve = data.get("consent_to_improve", False)
             existing.source = data.get("source", "post_analysis")
             existing.completed_at = timezone.now()
             existing.save()
@@ -120,11 +124,30 @@ class SubmitFeedbackView(generics.CreateAPIView):
             responses=data.get("responses", {}),
             rating=data.get("rating"),
             is_anonymous=data.get("is_anonymous", False),
+            is_bug_report=data.get("is_bug_report", False),
+            consent_to_improve=data.get("consent_to_improve", False),
             source=data.get("source", "post_analysis"),
             completed_at=timezone.now(),
         )
+
+        profile, points_awarded = PointsService.award_points_for_feedback(request.user)
+
+        NotificationService.notify_admins(
+            notification_type="feedback_submitted",
+            title="New ad feedback submitted",
+            message=f"A user submitted feedback for \"{video.title if video else 'a video'}\".",
+            data={"feedback_id": feedback.id, "rating": data.get("rating")},
+        )
+
         out = FeedbackResponseSerializer(feedback, context={"request": request})
-        return Response(out.data, status=status.HTTP_201_CREATED)
+        return Response(
+            {
+                **out.data,
+                "points_awarded": points_awarded,
+                "total_points": profile.points,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class FeedbackPendingCheckView(generics.GenericAPIView):
@@ -142,11 +165,14 @@ class UserFeedbackHistoryView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = FeedbackResponseSerializer
 
-    def get_queryset(self):
-        qs = FeedbackResponse.objects.filter(user=self.request.user).select_related("video", "user")
-        limit = safe_int_param(self.request, "limit", 20, 1, 100)
-        offset = safe_int_param(self.request, "offset", 0, 0)
-        return qs[offset:offset + limit]
+    def list(self, request, *args, **kwargs):
+        qs = FeedbackResponse.objects.filter(user=request.user).select_related("video", "user")
+        total = qs.count()
+        limit = safe_int_param(request, "limit", 20, 1, 100)
+        offset = safe_int_param(request, "offset", 0, 0)
+        page = qs.order_by("-submitted_at")[offset:offset + limit]
+        serializer = self.get_serializer(page, many=True)
+        return Response({"results": serializer.data, "total": total, "limit": limit, "offset": offset})
 
 
 class AdminFeedbackListView(generics.GenericAPIView):

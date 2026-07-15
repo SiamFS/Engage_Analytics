@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useContext, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useContext, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -35,6 +35,7 @@ import VideoPlayer from '../../Shared/VideoPlayer/VideoPlayer';
 import { LoadingState, ErrorState } from '../../Shared/VideoLoadingStates/VideoLoadingStates';
 import { AuthContext } from '../../../contexts/AuthProvider/AuthProvider';
 import getPlaceholderImage from '../../../utils/getPlaceholderImage';
+import FeedbackPopup from '../../Shared/FeedbackPopup/FeedbackPopup';
 
 const MODAL_THEME = { content: { inner: 'relative flex max-h-[90dvh] flex-col rounded-lg bg-elevated shadow' } };
 const PRIMARY_BUTTON_CLASS = "inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0";
@@ -240,6 +241,8 @@ const VideoDetail = () => {
   const [visibilityModalOpen, setVisibilityModalOpen] = useState(false);
   const [myEmotion, setMyEmotion] = useState(null);
   const [myEmotionLoading, setMyEmotionLoading] = useState(false);
+  const [showFeedbackPopup, setShowFeedbackPopup] = useState(false);
+  const feedbackTimerRef = useRef(null);
 
   useEffect(() => {
     const fetchVideoDetails = async () => {
@@ -338,6 +341,15 @@ const VideoDetail = () => {
     }
   }, [id]);
 
+  useEffect(() => {
+    return () => {
+      if (feedbackTimerRef.current) {
+        clearTimeout(feedbackTimerRef.current);
+        feedbackTimerRef.current = null;
+      }
+    };
+  }, []);
+
   const handleBack = () => {
     navigate(-1); 
   };
@@ -402,7 +414,17 @@ const VideoDetail = () => {
   };
 
   const handleVideoEnded = () => {
-    console.log('Video playback ended');
+    feedbackTimerRef.current = setTimeout(() => {
+      setShowFeedbackPopup(true);
+    }, 2000);
+  };
+
+  const handleUploadFlowDone = () => {
+    if (feedbackTimerRef.current) {
+      clearTimeout(feedbackTimerRef.current);
+      feedbackTimerRef.current = null;
+    }
+    setShowFeedbackPopup(true);
   };
 
   const handleToggleVisibility = async () => {
@@ -547,6 +569,7 @@ const VideoDetail = () => {
               videoId={video?.id}
               onPlay={recordView}
               onEnded={handleVideoEnded}
+              onUploadFlowDone={handleUploadFlowDone}
             />
           </motion.div>
 
@@ -728,6 +751,14 @@ const VideoDetail = () => {
           </FlowbiteButton>
         </Modal.Footer>
       </Modal>
+
+      {showFeedbackPopup && (
+        <FeedbackPopup
+          videoId={video?.id}
+          onClose={() => setShowFeedbackPopup(false)}
+          onComplete={() => setShowFeedbackPopup(false)}
+        />
+      )}
     </div>
   );
 };

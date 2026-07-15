@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BarChart3, PieChart, Activity, Video, Camera, Brain, Shield, ChevronRight, Star, Award, Users, Target, TrendingUp } from 'lucide-react';
+import { BarChart3, PieChart, Activity, Video, Camera, Brain, Shield, ChevronRight, Star, Award, Users, Target, TrendingUp, ThumbsUp } from 'lucide-react';
 
 const About = () => {
   const navigate = useNavigate();
@@ -89,7 +89,7 @@ const About = () => {
 
         <div className="mb-20">
           <h2 className="text-2xl md:text-3xl font-bold mb-8 text-white text-center">Rewards &amp; Points</h2>
-          <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="card-base bg-elevated border-elevated-border p-6 text-center">
               <div className="w-12 h-12 bg-yellow-500/20 rounded-xl flex items-center justify-center mx-auto mb-4">
                 <Star size={24} className="text-yellow-400 fill-yellow-400" />
@@ -103,8 +103,16 @@ const About = () => {
                 <Camera size={24} className="text-brand-400" />
               </div>
               <h3 className="text-lg font-semibold text-white mb-2">Watch with Webcam</h3>
-              <p className="text-gray-400 text-sm mb-3">Earn <span className="text-yellow-400 font-bold">5 points</span> for each video you watch with your webcam enabled.</p>
+              <p className="text-gray-400 text-sm mb-3">Earn <span className="text-yellow-400 font-bold">10 points</span> for each video you watch with your webcam enabled.</p>
               <p className="text-xs text-gray-500">One-time reward per video view.</p>
+            </div>
+            <div className="card-base bg-elevated border-elevated-border p-6 text-center">
+              <div className="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center mx-auto mb-4">
+                <ThumbsUp size={24} className="text-purple-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-white mb-2">Rate Ads</h3>
+              <p className="text-gray-400 text-sm mb-3">Earn <span className="text-yellow-400 font-bold">3 points</span> for sharing your feedback on advertisements.</p>
+              <p className="text-xs text-gray-500">Optional — submit after watching with webcam.</p>
             </div>
             <div className="card-base bg-elevated border-elevated-border p-6 text-center">
               <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center mx-auto mb-4">

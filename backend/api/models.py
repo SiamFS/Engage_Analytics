@@ -548,6 +548,7 @@ class Notification(models.Model):
         ("upload_request_completed", "Upload Request Completed"),
         ("upload_request_cancelled", "Upload Request Cancelled"),
         ("upload_request_comment", "Upload Request Comment"),
+        ("feedback_submitted", "Feedback Submitted"),
     ]
 
     recipient = models.ForeignKey(

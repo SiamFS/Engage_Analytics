@@ -112,7 +112,7 @@ const FeedbackPopup = ({ videoId, onClose, onComplete }) => {
                     <ThumbsUp size={32} className="text-green-400" />
                   </div>
                   <h3 className="text-white text-lg font-semibold mb-1">Feedback Submitted!</h3>
-                  <p className="text-gray-300 text-sm">Thank you for rating this ad.</p>
+                  <p className="text-gray-300 text-sm">Thank you for rating this ad. You earned 3 points!</p>
                 </div>
               ) : step === 'prompt' ? (
                 <div className="text-center py-4">
@@ -120,8 +120,11 @@ const FeedbackPopup = ({ videoId, onClose, onComplete }) => {
                     <ThumbsUp size={28} className="text-brand-400" />
                   </div>
                   <h3 className="text-white text-lg font-semibold mb-2">What did you think of this ad?</h3>
-                  <p className="text-gray-300 text-sm mb-6">
+                  <p className="text-gray-300 text-sm mb-2">
                     Your opinion helps advertisers create better content.
+                  </p>
+                  <p className="text-yellow-400 text-xs font-medium mb-6 flex items-center justify-center gap-1">
+                    <Star size={14} className="fill-yellow-400" /> Earn 3 points for sharing your feedback!
                   </p>
                   <div className="flex gap-3 justify-center">
                     <button

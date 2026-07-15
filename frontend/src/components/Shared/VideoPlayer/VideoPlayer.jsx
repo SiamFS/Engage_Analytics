@@ -4,7 +4,7 @@ import { Button, Spinner } from 'flowbite-react';
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, CameraOff } from 'lucide-react';
 import WebcamRecorder from './WebcamRecorder';
 
-const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded, onPlay, videoId }) => {
+const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded, onPlay, videoId, onUploadFlowDone }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -311,6 +311,7 @@ const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded,
           onError={handleRecordingError}
           showControls={showControls}
           onFaceBlockedChange={handleFaceBlockedChange}
+          onUploadFlowDone={onUploadFlowDone}
         />
       )}
 
@@ -462,7 +463,8 @@ VideoPlayer.propTypes = {
   autoPlay: PropTypes.bool,
   onEnded: PropTypes.func,
   onPlay: PropTypes.func,
-  videoId: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
+  videoId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  onUploadFlowDone: PropTypes.func,
 };
 
 export default VideoPlayer;

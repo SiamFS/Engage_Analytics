@@ -19,6 +19,7 @@ const WebcamRecorder = forwardRef(({
   onError,
   showControls,
   onFaceBlockedChange,
+  onUploadFlowDone,
 }, ref) => {
   const navigate = useNavigate();
   const { toasts, addToast, dismissToast, clearToasts } = useToast();
@@ -1111,12 +1112,12 @@ const WebcamRecorder = forwardRef(({
                     setUploadComplete(false);
                     setUploadError(null);
                     clearToasts();
-                    navigate(-1);
+                    onUploadFlowDone && onUploadFlowDone();
                   }}
                   className="min-w-[180px]"
                 >
                   <ArrowLeft className="mr-2 h-4 w-4" />
-                  Go Back
+                  Continue
                 </Button>
               </div>
             ) : uploadError ? (
@@ -1136,11 +1137,11 @@ const WebcamRecorder = forwardRef(({
                       setIsUploading(false);
                       setUploadError(null);
                       clearToasts();
-                      navigate(-1);
+                      onUploadFlowDone && onUploadFlowDone();
                     }}
                   >
                     <ArrowLeft className="mr-2 h-4 w-4" />
-                    Go Back
+                    Continue
                   </Button>
                   {pendingBlobRef.current && (
                     <Button
@@ -1374,6 +1375,7 @@ WebcamRecorder.propTypes = {
   onError: PropTypes.func,
   showControls: PropTypes.bool,
   onFaceBlockedChange: PropTypes.func,
+  onUploadFlowDone: PropTypes.func,
 };
 
 export default WebcamRecorder;

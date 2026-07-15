@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 class PointsService:
     @staticmethod
-    def award_points_for_webcam_upload(user, points=5):
+    def award_points_for_webcam_upload(user, points=10):
         """Awards points to a user for successfully uploading webcam data."""
         with transaction.atomic():
             profile, _ = ViewerProfile.objects.get_or_create(user=user)
@@ -25,8 +25,8 @@ class PointsService:
         return profile, points
 
     @staticmethod
-    def award_points_for_video_upload(user, points=10):
-        """Awards points to a user for successfully uploading a video."""
+    def award_points_for_feedback(user, points=3):
+        """Awards points to a user for submitting ad feedback."""
         with transaction.atomic():
             profile, _ = ViewerProfile.objects.get_or_create(user=user)
             profile.points += points
@@ -36,7 +36,7 @@ class PointsService:
             recipient=user,
             notification_type="points_earned",
             title=f"You earned {points} points!",
-            message=f"You received {points} points for uploading a video.",
-            data={"points": points, "reason": "video_upload"},
+            message=f"You received {points} points for submitting ad feedback.",
+            data={"points": points, "reason": "feedback"},
         )
         return profile, points
