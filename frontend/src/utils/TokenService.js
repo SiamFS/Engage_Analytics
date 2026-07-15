@@ -7,7 +7,7 @@ const TokenService = {
   profileUpdateTimeKey: 'profile_last_update_time',
   lastTokenSetTimeKey: 'last_token_set_time',
 
-  sessionDuration: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds 
+  sessionDuration: 50 * 60 * 1000, // 50 minutes (Firebase tokens expire in 1 hour)
   tokenRateLimitMs: 1000, //1sec
 
   maxDevices: 5,

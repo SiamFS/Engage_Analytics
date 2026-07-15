@@ -201,11 +201,6 @@ const AuthProvider = ({ children }) => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       
-      if (!userCredential.user.emailVerified) {
-        await signOut(auth);
-        throw new Error('EMAIL_NOT_VERIFIED');
-      }
-  
       const deviceId = TokenService.getCurrentDeviceId();
       
       try {

@@ -35,7 +35,7 @@ const AuthForm = ({
 
   return (
     <motion.div 
-      className="min-h-screen flex flex-col justify-center items-center px-3 sm:px-4 md:px-6 py-6 sm:py-8 md:py-12 bg-surface overflow-auto"
+      className="min-h-screen flex flex-col justify-center items-center px-3 sm:px-4 md:px-6 py-6 sm:py-8 md:py-12 bg-surface"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
