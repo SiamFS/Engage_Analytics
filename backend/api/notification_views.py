@@ -10,7 +10,7 @@ from api.serializers import (
     UnreadCountSerializer,
 )
 from api.services.notification_service import NotificationService
-from api.models import UserNotificationPreference
+from api.models import UserNotificationPreference, Notification
 from api.utils import safe_int_param
 
 
@@ -79,6 +79,14 @@ class NotificationDeleteView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class NotificationDeleteAllView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        deleted = NotificationService.delete_all_notifications(request.user)
+        return Response({"deleted": deleted})
 
 
 class NotificationArchiveView(APIView):

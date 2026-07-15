@@ -17,12 +17,11 @@ import {
   Trash2,
   Loader2,
   BellOff,
-  Filter,
+  Settings,
   ChevronLeft,
   ChevronRight,
   Check,
   X,
-  Settings,
 } from 'lucide-react';
 import NotificationService from '../../../utils/NotificationService';
 
@@ -66,6 +65,7 @@ const NotificationCenter = () => {
   const [error, setError] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [markingAll, setMarkingAll] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(null); // 'all' | 'selected' | notificationId
 
   const filterType = searchParams.get('type') || '';
   const filterUnread = searchParams.get('unread') === 'true';
@@ -133,6 +133,45 @@ const NotificationCenter = () => {
       // silently fail
     } finally {
       setMarkingAll(false);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    setConfirmDelete('all');
+  };
+
+  const handleConfirmDelete = async () => {
+    if (confirmDelete === 'all') {
+      setMarkingAll(true);
+      try {
+        await NotificationService.deleteAllNotifications();
+        setNotifications([]);
+        setTotal(0);
+        setSelectedIds(new Set());
+      } catch {
+        // silently fail
+      } finally {
+        setMarkingAll(false);
+        setConfirmDelete(null);
+      }
+    } else if (typeof confirmDelete === 'number') {
+      try {
+        await NotificationService.deleteNotification(confirmDelete);
+        setNotifications((prev) => prev.filter((n) => n.id !== confirmDelete));
+        setTotal((prev) => prev - 1);
+      } catch {
+        // silently fail
+      } finally {
+        setConfirmDelete(null);
+      }
+    } else if (confirmDelete === 'selected') {
+      for (const id of selectedIds) {
+        try { await NotificationService.deleteNotification(id); } catch { /* skip */ }
+      }
+      setNotifications((prev) => prev.filter((n) => !selectedIds.has(n.id)));
+      setTotal((prev) => prev - selectedIds.size);
+      setSelectedIds(new Set());
+      setConfirmDelete(null);
     }
   };
 
@@ -213,45 +252,15 @@ const NotificationCenter = () => {
             <Settings size={14} />
             Settings
           </Link>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        <Filter size={14} className="text-gray-400" />
-        <button
-          onClick={() => updateParams({ type: '', unread: false, page: 1 })}
-          className={`px-3 py-1 text-xs rounded-full transition-colors ${
-            !filterType && !filterUnread
-              ? 'bg-brand-600 text-white'
-              : 'bg-surface-600 text-gray-300 hover:bg-surface-500'
-          }`}
-        >
-          All
-        </button>
-        <button
-          onClick={() => updateParams({ unread: true, page: 1 })}
-          className={`px-3 py-1 text-xs rounded-full transition-colors ${
-            filterUnread
-              ? 'bg-brand-600 text-white'
-              : 'bg-surface-600 text-gray-300 hover:bg-surface-500'
-          }`}
-        >
-          Unread
-        </button>
-        {Object.entries(TYPE_LABELS).map(([type, label]) => (
           <button
-            key={type}
-            onClick={() => updateParams({ type, unread: false, page: 1 })}
-            className={`px-3 py-1 text-xs rounded-full transition-colors ${
-              filterType === type
-              ? 'bg-brand-600 text-white'
-              : 'bg-surface-600 text-gray-300 hover:bg-surface-500'
-            }`}
+            onClick={handleDeleteAll}
+            disabled={notifications.length === 0}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-400 bg-red-500/10 hover:bg-red-500/20 rounded-lg transition-colors disabled:opacity-30"
           >
-            {label}
+            <Trash2 size={14} />
+            Clear All
           </button>
-        ))}
+        </div>
       </div>
 
       {/* Bulk actions */}
@@ -266,7 +275,7 @@ const NotificationCenter = () => {
             <Check size={12} /> Mark Read
           </button>
           <button
-            onClick={handleDeleteSelected}
+            onClick={() => setConfirmDelete('selected')}
             className="inline-flex items-center gap-1 px-2.5 py-1 text-xs text-red-300 bg-red-500/10 hover:bg-red-500/20 rounded-md transition-colors"
           >
             <Trash2 size={12} /> Delete
@@ -365,11 +374,9 @@ const NotificationCenter = () => {
                     </button>
                   )}
                   <button
-                    onClick={async (e) => {
+                    onClick={(e) => {
                       e.stopPropagation();
-                      await NotificationService.deleteNotification(notification.id);
-                      setNotifications((prev) => prev.filter((n) => n.id !== notification.id));
-                      setTotal((prev) => prev - 1);
+                      setConfirmDelete(notification.id);
                     }}
                     className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-surface-600 rounded-lg transition-colors"
                     title="Delete"
@@ -413,6 +420,36 @@ const NotificationCenter = () => {
           >
             <ChevronRight size={18} />
           </button>
+        </div>
+      )}
+
+      {confirmDelete !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setConfirmDelete(null)} />
+          <div className="relative bg-elevated border border-elevated-border rounded-xl shadow-2xl p-6 max-w-sm w-full">
+            <h3 className="text-white text-lg font-semibold mb-2">Confirm Delete</h3>
+            <p className="text-gray-400 text-sm mb-6">
+              {confirmDelete === 'all'
+                ? 'Are you sure you want to delete ALL notifications? This cannot be undone.'
+                : confirmDelete === 'selected'
+                ? `Delete ${selectedIds.size} selected notification(s)?`
+                : 'Delete this notification?'}
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-300 bg-surface-600 hover:bg-surface-500 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

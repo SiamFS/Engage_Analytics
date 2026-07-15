@@ -432,15 +432,11 @@ class UploadVideoView(generics.CreateAPIView):
 
             CacheService.invalidate_video_lists()
 
-            profile, points_awarded = PointsService.award_points_for_video_upload(request.user)
-
             return Response(
                 {
                     "video_upload_url": video_upload_url,
                     "thumbnail_upload_url": thumbnail_upload_url,
                     "message": "SAS tokens generated successfully",
-                    "points_awarded": points_awarded,
-                    "total_points": profile.points,
                 },
                 status=status.HTTP_201_CREATED,
             )
@@ -597,6 +593,17 @@ class RecentVideosView(generics.ListAPIView):
         return Video.get_recently_uploaded_videos(limit, offset)
 
 
+class PopularVideosView(generics.ListAPIView):
+    permission_classes = [AllowAny]
+    serializer_class = VideoFeedSerializer
+
+    def get_queryset(self):
+        limit = safe_int_param(self.request, "limit", 20, 1, 50)
+        offset = safe_int_param(self.request, "offset", 0, 0)
+
+        return Video.get_popular_videos(limit, offset)
+
+
 def _frame_to_dict(frame):
     return {
         "t": frame.t_seconds,
@@ -682,6 +689,12 @@ class VideoEmotionSummaryView(generics.GenericAPIView):
             failed_recordings = WebcamRecording.objects.filter(
                 video=video, analysis_status="failed"
             ).count()
+            no_faces_recordings = WebcamRecording.objects.filter(
+                video=video, analysis_status="completed"
+            ).exclude(emotion_frames__isnull=True).count()
+            no_faces_recordings = WebcamRecording.objects.filter(
+                video=video, analysis_status="completed"
+            ).count() - no_faces_recordings
             return Response(
                 {
                     "distribution": {e: 0.0 for e in EMOTION_CLASSES},
@@ -691,6 +704,7 @@ class VideoEmotionSummaryView(generics.GenericAPIView):
                     "total_recordings": total_recordings,
                     "completed_recordings": completed_recordings,
                     "failed_recordings": failed_recordings,
+                    "no_faces_recordings": no_faces_recordings,
                 }
             )
         return Response(VideoEmotionSummarySerializer(summary).data)

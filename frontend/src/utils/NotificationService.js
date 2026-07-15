@@ -96,6 +96,11 @@ class NotificationService {
     this.clearCache();
   }
 
+  static async deleteAllNotifications() {
+    await ApiService.post('notifications/delete-all/', {});
+    this.clearCache();
+  }
+
   static async archiveNotification(notificationId) {
     await ApiService.post(`notifications/${notificationId}/archive/`, {});
     this.clearCache();

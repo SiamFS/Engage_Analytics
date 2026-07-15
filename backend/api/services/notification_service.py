@@ -91,6 +91,11 @@ class NotificationService:
             return None
 
     @classmethod
+    def delete_all_notifications(cls, user):
+        deleted, _ = Notification.objects.filter(recipient=user).delete()
+        return deleted
+
+    @classmethod
     def cleanup_old_notifications(cls, days=90):
         cutoff = timezone.now() - timezone.timedelta(days=days)
         deleted, _ = Notification.objects.filter(created_at__lt=cutoff, is_read=True).delete()

@@ -134,8 +134,6 @@ class EmotionAnalysisService:
             frame_rate = int(getattr(settings, "ANALYSIS_FRAME_RATE", 1) or 1)
             frames = cls._extract_faces(video_path, frame_rate)
 
-            EmotionFrame.objects.filter(recording=recording).delete()
-
             if not frames:
                 return
 
@@ -161,6 +159,8 @@ class EmotionAnalysisService:
                         confidence=emotions[dominant],
                     )
                 )
+
+            EmotionFrame.objects.filter(recording=recording).delete()
             EmotionFrame.objects.bulk_create(to_create, batch_size=100)
 
             WebcamUploadService.generate_thumbnail(recording.id, video_path=video_path)
@@ -295,7 +295,6 @@ class EmotionAnalysisService:
             cls._haar = None
         return cls._haar
 
-    @classmethod
     @classmethod
     def _classify_face(cls, face_image) -> List[Dict]:
         import io

@@ -273,6 +273,9 @@ const DetailedAnalytics = () => {
                 {summary.failed_recordings > 0 && (
                   <p className="text-red-400">Failed analyses: <span className="font-medium">{summary.failed_recordings}</span> — check the table below for error details</p>
                 )}
+                {summary.no_faces_recordings > 0 && (
+                  <p className="text-yellow-400">No faces detected: <span className="font-medium">{summary.no_faces_recordings}</span> — analysis ran but found no face in webcam. Ensure proper lighting and face visibility.</p>
+                )}
                 {summary.total_recordings > 0 && summary.completed_recordings === 0 && (
                   <p className="text-yellow-400">No recordings are fully uploaded yet. Ensure the green checkmark appears after recording.</p>
                 )}
@@ -385,6 +388,7 @@ const DetailedAnalytics = () => {
                       .sort((a, b) => b[1] - a[1])[0];
                     const topLabel = EMOTIONS.find(e => e.key === top?.[0])?.label || top?.[0];
                     const isAnalyzed = r.analysis_status === 'completed' && (r.timeline || []).length > 0;
+                    const isNoFaces = r.analysis_status === 'completed' && (r.timeline || []).length === 0;
                     const isFailed = r.analysis_status === 'failed';
                     const isPending = r.analysis_status === 'pending' || r.analysis_status === 'processing';
                     const isUploadPending = r.upload_status !== 'completed';
@@ -393,6 +397,8 @@ const DetailedAnalytics = () => {
                       <span className="px-2 py-0.5 text-xs rounded-full bg-yellow-900/50 text-yellow-400 border border-yellow-700">Upload pending</span>
                     ) : isAnalyzed ? (
                       <span className="px-2 py-0.5 text-xs rounded-full bg-green-900/50 text-green-400 border border-green-700">Analyzed</span>
+                    ) : isNoFaces ? (
+                      <span className="px-2 py-0.5 text-xs rounded-full bg-yellow-900/50 text-yellow-400 border border-yellow-700" title="Analysis completed but no face was detected in the webcam frames">No face detected</span>
                     ) : isFailed ? (
                       <span className="px-2 py-0.5 text-xs rounded-full bg-red-900/50 text-red-400 border border-red-700">Failed</span>
                     ) : isPending ? (

@@ -726,7 +726,10 @@ const WebcamRecorder = forwardRef(({
       recordingTimeoutRef.current = null;
     }
     
-    if (!mediaRecorderRef.current) return Promise.resolve();
+    if (!mediaRecorderRef.current) {
+      onUploadFlowDone && onUploadFlowDone();
+      return Promise.resolve();
+    }
     
     return new Promise((resolve, reject) => {
       const handleStop = async () => {

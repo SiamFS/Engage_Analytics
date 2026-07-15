@@ -63,7 +63,7 @@ const NavigationBar = () => {
     return (
       <>
         <Link to="/" onClick={onClick} className={`${baseClass} ${activeClass}`}>Home</Link>
-        <Link to="/about" onClick={onClick} className={`${baseClass} ${inactiveClass}`}>About</Link>
+        {!user && <Link to="/about" onClick={onClick} className={`${baseClass} ${inactiveClass}`}>About</Link>}
         <Link to="/videos" onClick={onClick} className={`${baseClass} ${inactiveClass}`}>Videos</Link>
       </>
     );

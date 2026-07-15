@@ -38,7 +38,7 @@ const LoggedInView = () => {
           await Promise.allSettled([
             ApiService.get('featured-carousel/?limit=5'),
             ApiService.get('recent-videos/?limit=8'),
-            ApiService.get('trending-videos/?limit=8'),
+            ApiService.get('popular-videos/?limit=8'),
             ApiService.get('recommendations/?limit=8')
           ]);
         

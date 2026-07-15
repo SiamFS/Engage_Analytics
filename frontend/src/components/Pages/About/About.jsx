@@ -89,15 +89,7 @@ const About = () => {
 
         <div className="mb-20">
           <h2 className="text-2xl md:text-3xl font-bold mb-8 text-white text-center">Rewards &amp; Points</h2>
-          <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="card-base bg-elevated border-elevated-border p-6 text-center">
-              <div className="w-12 h-12 bg-yellow-500/20 rounded-xl flex items-center justify-center mx-auto mb-4">
-                <Star size={24} className="text-yellow-400 fill-yellow-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-white mb-2">Upload Videos</h3>
-              <p className="text-gray-400 text-sm mb-3">Earn <span className="text-yellow-400 font-bold">10 points</span> for each video you upload to the platform.</p>
-              <p className="text-xs text-gray-500">One-time reward per video upload.</p>
-            </div>
+          <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="card-base bg-elevated border-elevated-border p-6 text-center">
               <div className="w-12 h-12 bg-brand-500/20 rounded-xl flex items-center justify-center mx-auto mb-4">
                 <Camera size={24} className="text-brand-400" />

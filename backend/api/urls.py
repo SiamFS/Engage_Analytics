@@ -17,6 +17,7 @@ from api.views import (
     CategoryVideosView,
     TrendingVideosView,
     RecentVideosView,
+    PopularVideosView,
     WebcamUploadCompleteView,
     RunEmotionAnalysisView,
     EmotionAnalysisStatusView,
@@ -68,6 +69,7 @@ from api.notification_views import (
     NotificationMarkReadView,
     NotificationMarkAllReadView,
     NotificationDeleteView,
+    NotificationDeleteAllView,
     NotificationArchiveView,
     NotificationPreferenceView,
     AdminNotificationListView,
@@ -126,6 +128,7 @@ urlpatterns = [
     path("category-videos/", CategoryVideosView.as_view(), name="category-videos"),
     path("trending-videos/", TrendingVideosView.as_view(), name="trending-videos"),
     path("recent-videos/", RecentVideosView.as_view(), name="recent-videos"),
+    path("popular-videos/", PopularVideosView.as_view(), name="popular-videos"),
     # User-facing webcam recordings
     path(
         "webcam-recordings/",
@@ -201,6 +204,11 @@ urlpatterns = [
         "notifications/read-all/",
         NotificationMarkAllReadView.as_view(),
         name="notification-mark-all-read",
+    ),
+    path(
+        "notifications/delete-all/",
+        NotificationDeleteAllView.as_view(),
+        name="notification-delete-all",
     ),
     path(
         "notifications/<int:notification_id>/",

@@ -243,6 +243,7 @@ const VideoDetail = () => {
   const [myEmotionLoading, setMyEmotionLoading] = useState(false);
   const [showFeedbackPopup, setShowFeedbackPopup] = useState(false);
   const feedbackTimerRef = useRef(null);
+  const popupShownRef = useRef(false);
 
   useEffect(() => {
     const fetchVideoDetails = async () => {
@@ -250,6 +251,12 @@ const VideoDetail = () => {
         setLoading(true);
         setError(null);
         setViewRecorded(false);
+        setShowFeedbackPopup(false);
+        popupShownRef.current = false;
+        if (feedbackTimerRef.current) {
+          clearTimeout(feedbackTimerRef.current);
+          feedbackTimerRef.current = null;
+        }
         
         const videoDataResult = VideoService.getVideoDetails(id);
         const videoData = await (videoDataResult instanceof Promise ? videoDataResult : Promise.resolve(videoDataResult));
@@ -348,7 +355,7 @@ const VideoDetail = () => {
         feedbackTimerRef.current = null;
       }
     };
-  }, []);
+  }, [id]);
 
   const handleBack = () => {
     navigate(-1); 
@@ -414,9 +421,7 @@ const VideoDetail = () => {
   };
 
   const handleVideoEnded = () => {
-    feedbackTimerRef.current = setTimeout(() => {
-      setShowFeedbackPopup(true);
-    }, 2000);
+    popupShownRef.current = false;
   };
 
   const handleUploadFlowDone = () => {
@@ -424,7 +429,10 @@ const VideoDetail = () => {
       clearTimeout(feedbackTimerRef.current);
       feedbackTimerRef.current = null;
     }
-    setShowFeedbackPopup(true);
+    if (!popupShownRef.current) {
+      popupShownRef.current = true;
+      setTimeout(() => setShowFeedbackPopup(true), 400);
+    }
   };
 
   const handleToggleVisibility = async () => {

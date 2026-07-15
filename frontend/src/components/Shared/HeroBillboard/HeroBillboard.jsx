@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Play, X, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
 import VideoPlayer from '../VideoPlayer/VideoPlayer';
 import getPlaceholderImage from '../../../utils/getPlaceholderImage';
@@ -9,6 +9,7 @@ const HeroBillboard = ({ videos }) => {
   const [showVideo, setShowVideo] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [autoplay, setAutoplay] = useState(true);
+  const navigate = useNavigate();
 
   if (!videos || !videos.length) return null;
 
@@ -28,7 +29,7 @@ const HeroBillboard = ({ videos }) => {
 
   const handlePlayClick = () => {
     if (currentVideo.video_url) setShowVideo(true);
-    else window.location.href = `/video/${currentVideo.uuid || currentVideo.id}`;
+    else navigate(`/video/${currentVideo.uuid || currentVideo.id}`);
   };
 
   const goToPrevious = () => {
