@@ -33,6 +33,16 @@ class VideoService {
     }
   }
 
+  static clearCache() {
+    this._cache.videoFeed = null;
+    this._cache.videoFeedTime = 0;
+    this._cache.videoDetails = {};
+    this._cache.videoDetailsOrder = [];
+    this._cache.adminVideos = null;
+    this._cache.adminVideosTime = 0;
+    this._cache.inProgress = {};
+  }
+
   /**
    * Fetch public videos for the feed
    * @returns {Array} Array of videos

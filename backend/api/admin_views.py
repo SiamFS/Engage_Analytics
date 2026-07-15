@@ -141,6 +141,9 @@ class VideoManagementView(generics.GenericAPIView):
         if serializer.is_valid():
             serializer.save()
             CacheService.invalidate_feed()
+            CacheService.invalidate_features()
+            CacheService.invalidate_trending()
+            CacheService.invalidate_recommendations()
             return Response(serializer.data)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -149,6 +152,9 @@ class VideoManagementView(generics.GenericAPIView):
         video = self.get_object_by_id(video_id)
         video.delete()
         CacheService.invalidate_feed()
+        CacheService.invalidate_features()
+        CacheService.invalidate_trending()
+        CacheService.invalidate_recommendations()
         return Response(
             {"message": "Video successfully deleted"}, status=status.HTTP_204_NO_CONTENT
         )

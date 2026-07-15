@@ -28,7 +28,7 @@ const DashboardLayout = () => {
         }`}
         style={{marginTop: '64px'}}
       >
-        <div className="p-4 sm:p-6 md:p-8 overflow-y-auto h-[calc(100vh-64px)]">
+        <div className="p-4 sm:p-6 md:p-8 overflow-y-auto h-[calc(100vh-64px)] dashboard-content-wrapper">
           <Outlet />
         </div>
       </div>

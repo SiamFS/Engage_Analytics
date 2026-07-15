@@ -257,6 +257,12 @@ class RecordVideoViewAPI(generics.CreateAPIView):
                 {"error": "Video is private"}, status=status.HTTP_403_FORBIDDEN
             )
 
+        if privacy_changed:
+            CacheService.invalidate_feed()
+            CacheService.invalidate_features()
+            CacheService.invalidate_trending()
+            CacheService.invalidate_recommendations()
+
         return Response(
             {
                 "success": True,
@@ -284,7 +290,12 @@ class ToggleVideoLikeAPI(generics.CreateAPIView):
                 {"error":AUTH_REQUIRED_MESSAGE},
                 status=status.HTTP_401_UNAUTHORIZED
             )
-        
+
+        CacheService.invalidate_feed()
+        CacheService.invalidate_features()
+        CacheService.invalidate_trending()
+        CacheService.invalidate_recommendations()
+
         return Response(
             {
                 "liked": liked,
@@ -424,6 +435,9 @@ class UploadVideoView(generics.CreateAPIView):
             )
 
             CacheService.invalidate_feed()
+            CacheService.invalidate_features()
+            CacheService.invalidate_trending()
+            CacheService.invalidate_recommendations()
 
             return Response(
                 {

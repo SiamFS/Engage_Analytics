@@ -2,6 +2,7 @@ import React from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import NavigationBar from './components/Shared/Navbar/Navbar';
 import MainFooter from './components/Shared/Footer/Footer';
+import ScrollToTop from './components/Shared/ScrollToTop/ScrollToTop';
 
 
 const AUTH_ROUTES = ['/login', '/signup', '/forgetpassword'];
@@ -16,6 +17,9 @@ function App() {
       {/* navbar */}
       {!isAuthPage && <NavigationBar />}
       
+      {/* Scroll to top on route change */}
+      <ScrollToTop />
+
       {/* Main content */}
       <main className={`${!isAuthPage ? 'pt-16' : ''}`}>
         <Outlet /> 

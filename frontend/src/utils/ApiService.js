@@ -159,12 +159,11 @@ const ApiService = {
   /**
    * Create an error object from response data
    */
-  async createErrorFromResponse(response, defaultPrefix = 'API error') {
+  async createErrorFromResponse(response) {
     const data = await this.parseResponseData(response);
     const message = this.extractErrorMessage(data);
-    const errorMessage = `${defaultPrefix} (${response.status}): ${message}`;
-    
-    const error = new Error(errorMessage);
+
+    const error = new Error(message);
     error.status = response.status;
     error.data = data;
     return error;

@@ -75,7 +75,7 @@ const AdminVideos = () => {
     try {
       setLoading(true);
       setError(null);
-      VideoService.adminDeleteVideo(deleteVideoId);
+      await VideoService.adminDeleteVideo(deleteVideoId);
       
       if (isMounted.current) {
         setSuccess('Video successfully deleted');
