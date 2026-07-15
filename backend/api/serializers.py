@@ -426,6 +426,8 @@ class FeedbackSubmitSerializer(serializers.Serializer):
     responses = serializers.JSONField(default=dict)
     rating = serializers.IntegerField(required=False, allow_null=True, min_value=1, max_value=5)
     is_anonymous = serializers.BooleanField(default=False)
+    is_bug_report = serializers.BooleanField(default=False)
+    consent_to_improve = serializers.BooleanField(default=False)
     source = serializers.ChoiceField(choices=FeedbackResponse.FEEDBACK_SOURCES, default="post_analysis")
 
 

@@ -426,6 +426,7 @@ class WebcamRecording(models.Model):
     analysis_error = models.TextField(blank=True, null=True)
     analysis_attempts = models.PositiveIntegerField(default=0)
     analysis_started_at = models.DateTimeField(null=True, blank=True)
+    points_awarded = models.BooleanField(default=False)
 
     class Meta:
         ordering = ["-recording_date"]

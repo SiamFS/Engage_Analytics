@@ -675,12 +675,22 @@ class VideoEmotionSummaryView(generics.GenericAPIView):
 
         summary = getattr(video, "emotion_summary", None)
         if not summary:
+            total_recordings = WebcamRecording.objects.filter(video=video).count()
+            completed_recordings = WebcamRecording.objects.filter(
+                video=video, upload_status="completed"
+            ).count()
+            failed_recordings = WebcamRecording.objects.filter(
+                video=video, analysis_status="failed"
+            ).count()
             return Response(
                 {
                     "distribution": {e: 0.0 for e in EMOTION_CLASSES},
                     "timeline": [],
                     "total_frames": 0,
                     "analyzed_recordings": 0,
+                    "total_recordings": total_recordings,
+                    "completed_recordings": completed_recordings,
+                    "failed_recordings": failed_recordings,
                 }
             )
         return Response(VideoEmotionSummarySerializer(summary).data)
@@ -696,37 +706,45 @@ class VideoEmotionRecordingsView(generics.GenericAPIView):
         reveal_viewer = request.user.role == "admin"
 
         recordings = WebcamRecording.objects.filter(
-            video=video, analysis_status="completed"
+            video=video
         ).prefetch_related("emotion_frames").order_by("-recording_date")
 
         data = []
         for recording in recordings:
             frames = list(recording.emotion_frames.all().order_by("t_seconds"))
-            if not frames:
-                continue
-
-            distribution = {e: 0.0 for e in EMOTION_CLASSES}
-            for frame in frames:
-                for e in EMOTION_CLASSES:
-                    distribution[e] += getattr(frame, e)
-            distribution = {
-                e: round(distribution[e] / len(frames), 4) for e in EMOTION_CLASSES
-            }
-
-            timeline = [_frame_to_dict(f) for f in frames]
-            duration = max((f.t_seconds for f in frames), default=0)
 
             entry = {
                 "recording_id": recording.id,
                 "filename": recording.filename,
                 "recording_url": recording.recording_url,
                 "thumbnail_url": recording.thumbnail_url,
-                "distribution": distribution,
-                "timeline": timeline,
-                "duration": round(duration, 2),
+                "analysis_status": recording.analysis_status,
+                "upload_status": recording.upload_status,
+                "analysis_error": recording.analysis_error,
             }
             if reveal_viewer:
                 entry["viewer_id"] = recording.recorder_id
+
+            if frames:
+                distribution = {e: 0.0 for e in EMOTION_CLASSES}
+                for frame in frames:
+                    for e in EMOTION_CLASSES:
+                        distribution[e] += getattr(frame, e)
+                distribution = {
+                    e: round(distribution[e] / len(frames), 4) for e in EMOTION_CLASSES
+                }
+
+                timeline = [_frame_to_dict(f) for f in frames]
+                duration = max((f.t_seconds for f in frames), default=0)
+
+                entry["distribution"] = distribution
+                entry["timeline"] = timeline
+                entry["duration"] = round(duration, 2)
+            else:
+                entry["distribution"] = {e: 0.0 for e in EMOTION_CLASSES}
+                entry["timeline"] = []
+                entry["duration"] = 0
+
             data.append(entry)
 
         return Response(data)

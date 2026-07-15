@@ -53,8 +53,6 @@ const getNavItems = (role) => {
     baseItems.push(
       { path: '/dashboard/history', name: 'Watch History', icon: <Clock size={20} /> },
       { path: '/dashboard/liked-videos', name: 'Liked Videos', icon: <ThumbsUp size={20} /> },
-      { path: '/dashboard/my-feedback', name: 'My Feedback', icon: <MessageSquareText size={20} /> },
-      analyticsItem,
     );
   }
   return baseItems;

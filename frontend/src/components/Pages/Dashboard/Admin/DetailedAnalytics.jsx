@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
 import { Card, Button, Spinner, Alert, Select, Table, Modal } from 'flowbite-react';
-import { Play, RefreshCw, BarChart3, Activity, UserRound, Download, Trash2, Video as VideoIcon, ChevronDown, ChevronUp } from 'lucide-react';
+import { Play, RefreshCw, BarChart3, Activity, UserRound, Download, Trash2, Video as VideoIcon } from 'lucide-react';
 import {
   ResponsiveContainer,
   PieChart, Pie, Cell, Tooltip as RTooltip, Legend,
@@ -8,7 +8,6 @@ import {
 } from 'recharts';
 import VideoService from '../../../../utils/VideoService';
 import { AuthContext } from '../../../../contexts/AuthProvider/AuthProvider';
-import getPlaceholderImage from '../../../../utils/getPlaceholderImage';
 
 const EMOTIONS = [
   { key: 'happy', label: 'Happy', color: '#22c55e' },
@@ -61,6 +60,7 @@ const DetailedAnalytics = () => {
   useEffect(() => {
     mountedRef.current = true;
     loadVideos();
+    if (isAdmin) loadRunStatus();
     return () => {
       mountedRef.current = false;
       if (pollTimerRef.current) {
@@ -126,14 +126,6 @@ const DetailedAnalytics = () => {
     }
   };
 
-  const stopPolling = () => {
-    if (pollTimerRef.current) {
-      clearInterval(pollTimerRef.current);
-      pollTimerRef.current = null;
-    }
-    setIsRunning(false);
-  };
-
   const handleSelectVideo = (e) => {
     const id = parseInt(e.target.value, 10);
     setSelectedVideoId(id);
@@ -191,6 +183,8 @@ const DetailedAnalytics = () => {
   const progressText =
     runStatus && runStatus.status === 'running'
       ? `${runStatus.processed || 0} / ${runStatus.total || 0} processed`
+      : runStatus && runStatus.status === 'failed'
+      ? `Last run: FAILED — ${runStatus.error || 'Unknown error'}`
       : runStatus
       ? `Last run: ${runStatus.status} (${runStatus.processed || 0}/${runStatus.total || 0})`
       : 'No runs yet';
@@ -204,7 +198,7 @@ const DetailedAnalytics = () => {
         {isAdmin && (
           <div className="flex items-center gap-3">
             {runStatus && (
-              <span className="text-sm text-gray-400">{progressText}</span>
+              <span className={`text-sm max-w-[300px] truncate ${runStatus.status === 'failed' ? 'text-red-400' : 'text-gray-400'}`}>{progressText}</span>
             )}
             <Button
               color="blue"
@@ -266,11 +260,33 @@ const DetailedAnalytics = () => {
         </div>
       ) : !summary || summary.total_frames === 0 ? (
         <Card className="bg-elevated border-elevated-border shadow-md">
-          <p className="text-gray-300">
-            No emotion data yet for this video. Recordings are analyzed daily at 12:00 PM
-            (BD time), or click <span className="font-medium">Run analysis now</span> to
-            process completed webcam recordings immediately.
-          </p>
+          <div className="text-gray-300 space-y-3">
+            <p className="font-medium text-white">No emotion data yet for this video.</p>
+            {(summary?.total_recordings > 0 || summary?.completed_recordings > 0) && (
+              <div className="text-sm space-y-1 ml-1">
+                {summary.total_recordings > 0 && (
+                  <p>Total webcam recordings: <span className="text-white font-medium">{summary.total_recordings}</span></p>
+                )}
+                {summary.completed_recordings > 0 && (
+                  <p>Recordings ready for analysis: <span className="text-green-400 font-medium">{summary.completed_recordings}</span></p>
+                )}
+                {summary.failed_recordings > 0 && (
+                  <p className="text-red-400">Failed analyses: <span className="font-medium">{summary.failed_recordings}</span> — check the table below for error details</p>
+                )}
+                {summary.total_recordings > 0 && summary.completed_recordings === 0 && (
+                  <p className="text-yellow-400">No recordings are fully uploaded yet. Ensure the green checkmark appears after recording.</p>
+                )}
+              </div>
+            )}
+            <ul className="list-disc list-inside text-sm space-y-1 ml-1">
+              <li>Recordings are analyzed daily at 12:00 PM (BD time).</li>
+              {(!summary || summary.completed_recordings === 0) && (
+                <li>Ensure webcam recordings are fully uploaded (must show green checkmark after recording).</li>
+              )}
+              <li>If recordings are ready, {isAdmin ? <>click <span className="font-medium">Run analysis now</span></> : 'an admin must run'} to process them.</li>
+              <li>Analysis requires a detectable face in the webcam frames.</li>
+            </ul>
+          </div>
         </Card>
       ) : (
         <div className="space-y-6">
@@ -347,16 +363,17 @@ const DetailedAnalytics = () => {
             <h3 className="text-lg font-medium text-white mb-4 flex items-center">
               <UserRound size={18} className="mr-2" /> Per-Person Breakdown
               <span className="ml-2 text-sm text-gray-400 font-normal">
-                (identities hidden — {recordings.length} analyzed recordings)
+                ({recordings.length} recordings)
               </span>
             </h3>
             {recordings.length === 0 ? (
-              <p className="text-gray-400">No analyzed recordings for this video.</p>
+              <p className="text-gray-400">No recordings found for this video.</p>
             ) : (
               <Table hoverable>
                 <Table.Head>
                   <Table.HeadCell>Recording</Table.HeadCell>
                   <Table.HeadCell>Preview</Table.HeadCell>
+                  <Table.HeadCell>Status</Table.HeadCell>
                   <Table.HeadCell>Duration</Table.HeadCell>
                   <Table.HeadCell>Top emotion</Table.HeadCell>
                   <Table.HeadCell>Happy</Table.HeadCell>
@@ -367,6 +384,23 @@ const DetailedAnalytics = () => {
                     const top = Object.entries(r.distribution || {})
                       .sort((a, b) => b[1] - a[1])[0];
                     const topLabel = EMOTIONS.find(e => e.key === top?.[0])?.label || top?.[0];
+                    const isAnalyzed = r.analysis_status === 'completed' && (r.timeline || []).length > 0;
+                    const isFailed = r.analysis_status === 'failed';
+                    const isPending = r.analysis_status === 'pending' || r.analysis_status === 'processing';
+                    const isUploadPending = r.upload_status !== 'completed';
+
+                    const statusBadge = isUploadPending ? (
+                      <span className="px-2 py-0.5 text-xs rounded-full bg-yellow-900/50 text-yellow-400 border border-yellow-700">Upload pending</span>
+                    ) : isAnalyzed ? (
+                      <span className="px-2 py-0.5 text-xs rounded-full bg-green-900/50 text-green-400 border border-green-700">Analyzed</span>
+                    ) : isFailed ? (
+                      <span className="px-2 py-0.5 text-xs rounded-full bg-red-900/50 text-red-400 border border-red-700">Failed</span>
+                    ) : isPending ? (
+                      <span className="px-2 py-0.5 text-xs rounded-full bg-blue-900/50 text-blue-400 border border-blue-700">Pending</span>
+                    ) : (
+                      <span className="px-2 py-0.5 text-xs rounded-full bg-gray-900/50 text-gray-400 border border-gray-700">No data</span>
+                    );
+
                     return (
                       <React.Fragment key={r.recording_id}>
                         <Table.Row className="bg-elevated border-elevated-border hover:bg-surface-600 [&:hover>td]:bg-surface-600 [&>td]:bg-elevated transition-colors">
@@ -374,6 +408,11 @@ const DetailedAnalytics = () => {
                             <div className="flex flex-col">
                               <span className="text-sm font-medium">{r.filename || `Recording #${r.recording_id}`}</span>
                               <span className="text-xs text-gray-500">ID: {r.recording_id}</span>
+                              {isFailed && r.analysis_error && (
+                                <span className="text-xs text-red-400 mt-1 max-w-[200px] truncate" title={r.analysis_error}>
+                                  {r.analysis_error}
+                                </span>
+                              )}
                             </div>
                           </Table.Cell>
                           <Table.Cell>
@@ -390,12 +429,13 @@ const DetailedAnalytics = () => {
                               </div>
                             )}
                           </Table.Cell>
-                          <Table.Cell className="text-gray-300">{r.duration}s</Table.Cell>
+                          <Table.Cell>{statusBadge}</Table.Cell>
+                          <Table.Cell className="text-gray-300">{r.duration || '—'}s</Table.Cell>
                           <Table.Cell className="text-gray-300">
-                            {topLabel} {top ? `${(top[1] * 100).toFixed(0)}%` : ''}
+                            {isAnalyzed ? `${topLabel} ${top ? `${(top[1] * 100).toFixed(0)}%` : ''}` : '—'}
                           </Table.Cell>
                           <Table.Cell className="text-gray-300">
-                            {((r.distribution?.happy || 0) * 100).toFixed(0)}%
+                            {isAnalyzed ? `${((r.distribution?.happy || 0) * 100).toFixed(0)}%` : '—'}
                           </Table.Cell>
                           <Table.Cell>
                             <div className="flex gap-1">
@@ -412,6 +452,7 @@ const DetailedAnalytics = () => {
                               <Button
                                 color="light"
                                 size="xs"
+                                disabled={!isAnalyzed}
                                 onClick={() => setExpanded(expanded === r.recording_id ? null : r.recording_id)}
                               >
                                 {expanded === r.recording_id ? 'Hide' : 'Timeline'}
@@ -429,7 +470,7 @@ const DetailedAnalytics = () => {
                         </Table.Row>
                         {expanded === r.recording_id && (
                           <Table.Row className="bg-surface border-elevated-border [&>td]:bg-surface">
-                            <Table.Cell colSpan={5}>
+                            <Table.Cell colSpan={7}>
                               <ResponsiveContainer width="100%" height={220}>
                                 <LineChart data={r.timeline || []}>
                                   <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
