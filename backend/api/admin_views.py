@@ -459,6 +459,22 @@ class AdminUserManagementView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+        from firebase_admin import auth as firebase_auth
+
+        try:
+            fb_user = firebase_auth.create_user(
+                email=serializer.validated_data.get("email"),
+                password=serializer.validated_data.get("password") or "",
+                display_name=f"{serializer.validated_data.get('first_name', '')} {serializer.validated_data.get('last_name', '')}".strip(),
+            )
+            serializer.validated_data["firebase_uid"] = fb_user.uid
+        except Exception as e:
+            logger.error(f"Failed to create Firebase user: {e}")
+            return Response(
+                {"detail": f"Failed to create Firebase account: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         user = serializer.save()
 
         NotificationService.create_notification(

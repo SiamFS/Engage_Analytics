@@ -35,7 +35,7 @@ const AuthForm = ({
 
   return (
     <motion.div 
-      className="min-h-screen flex flex-col justify-center items-center px-3 sm:px-4 md:px-6 py-6 sm:py-8 md:py-12 bg-surface"
+      className="flex flex-col justify-center items-center px-3 sm:px-4 md:px-6 py-4 bg-surface"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -58,7 +58,7 @@ const AuthForm = ({
         <div className="flex justify-center mb-6 sm:mb-8">
           <BrandLogo className="w-auto h-10 sm:h-12" />
         </div>
-        <div className="relative bg-elevated backdrop-blur-md rounded-[16px] sm:rounded-[20px] md:rounded-[28px] border border-elevated-border shadow-2xl ring-1 ring-brand-900/30 p-4 sm:p-6 md:p-8 space-y-4 sm:space-y-5 max-h-[85vh] overflow-y-auto">
+        <div className="relative bg-elevated backdrop-blur-md rounded-[16px] sm:rounded-[20px] md:rounded-[28px] border border-elevated-border shadow-2xl ring-1 ring-brand-900/30 p-4 sm:p-6 md:p-8 space-y-4 sm:space-y-5">
           <h2 className="text-xl sm:text-2xl md:text-3xl font-semibold text-center text-white mb-2 sm:mb-3 sticky top-0 py-2 z-10">
             {title}
           </h2>
