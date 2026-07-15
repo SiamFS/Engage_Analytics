@@ -64,7 +64,7 @@ const SessionTimeoutHandler = () => {
           initial={{ opacity: 0, y: -50 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -50 }}
-          className="fixed top-4 right-4 z-50 max-w-md bg-white rounded-lg shadow-xl border border-yellow-200"
+          className="fixed top-4 right-4 z-50 max-w-md bg-surface rounded-lg shadow-xl border border-yellow-600/60"
         >
           <div className="p-4">
             <div className="flex items-start">
@@ -74,10 +74,10 @@ const SessionTimeoutHandler = () => {
                 </svg>
               </div>
               <div className="ml-3 w-0 flex-1">
-                <h3 className="text-sm font-medium text-gray-900">
+                <h3 className="text-sm font-medium text-white">
                   Session Expiring
                 </h3>
-                <p className="mt-1 text-sm text-gray-500">
+                <p className="mt-1 text-sm text-gray-400">
                   Your session will expire in <span className="font-medium text-yellow-600">{timeDisplay}</span>. 
                   Would you like to extend your session?
                 </p>
@@ -85,14 +85,14 @@ const SessionTimeoutHandler = () => {
                   <button
                     type="button"
                     onClick={extendSession}
-                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-brand-600 hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500"
                   >
                     Extend session
                   </button>
                   <button
                     type="button"
                     onClick={logout}
-                    className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    className="inline-flex items-center px-3 py-1.5 border border-elevated-border text-xs font-medium rounded-md text-gray-200 bg-elevated hover:bg-surface-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500"
                   >
                     Logout now
                   </button>

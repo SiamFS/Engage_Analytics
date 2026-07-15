@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
 import { Card, Button, Spinner, Alert, Select, Table, Modal } from 'flowbite-react';
-import { Play, RefreshCw, BarChart3, Activity, UserRound, Download, Trash2, Video as VideoIcon } from 'lucide-react';
+import { Play, RefreshCw, BarChart3, Activity, UserRound, Download, Trash2, Video as VideoIcon, ChevronDown, ChevronUp } from 'lucide-react';
 import {
   ResponsiveContainer,
   PieChart, Pie, Cell, Tooltip as RTooltip, Legend,
@@ -8,6 +8,7 @@ import {
 } from 'recharts';
 import VideoService from '../../../../utils/VideoService';
 import { AuthContext } from '../../../../contexts/AuthProvider/AuthProvider';
+import getPlaceholderImage from '../../../../utils/getPlaceholderImage';
 
 const EMOTIONS = [
   { key: 'happy', label: 'Happy', color: '#22c55e' },
@@ -228,25 +229,34 @@ const DetailedAnalytics = () => {
         <Alert color="failure" className="mb-4">{error}</Alert>
       )}
 
-      <Card className="bg-gray-800 border-gray-700 mb-6">
-        <div className="flex items-center gap-3">
-          <label className="text-white text-sm font-medium">Video:</label>
-          {videos.length === 0 ? (
-            <span className="text-gray-400 text-sm">No videos available</span>
-          ) : (
-            <Select
-              value={selectedVideoId || ''}
-              onChange={handleSelectVideo}
-              className="bg-gray-700 text-white border-gray-600 max-w-md"
-            >
-              {videos.map(v => (
-                <option key={v.id} value={v.id}>{v.title}</option>
-              ))}
-            </Select>
+      <Card className="bg-elevated border-elevated-border mb-6">
+        <div className="flex flex-wrap items-center gap-4">
+          {selectedVideoId && videos.find(v => v.id === selectedVideoId)?.thumbnail_url && (
+            <img
+              src={videos.find(v => v.id === selectedVideoId).thumbnail_url}
+              alt=""
+              className="w-20 h-12 object-cover rounded-lg border border-elevated-border shrink-0"
+            />
           )}
-          <Button color="light" onClick={() => selectedVideoId && loadAnalytics(selectedVideoId)}>
-            <RefreshCw size={16} className="mr-1" /> Refresh
-          </Button>
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <label className="text-white text-sm font-medium shrink-0">Video:</label>
+            {videos.length === 0 ? (
+              <span className="text-gray-400 text-sm">No videos available</span>
+            ) : (
+              <Select
+                value={selectedVideoId || ''}
+                onChange={handleSelectVideo}
+                className="bg-surface-600 text-white border-elevated-border flex-1 min-w-0"
+              >
+                {videos.map(v => (
+                  <option key={v.id} value={v.id}>{v.title}</option>
+                ))}
+              </Select>
+            )}
+            <Button color="light" onClick={() => selectedVideoId && loadAnalytics(selectedVideoId)}>
+              <RefreshCw size={16} className="mr-1" /> Refresh
+            </Button>
+          </div>
         </div>
       </Card>
 
@@ -255,7 +265,7 @@ const DetailedAnalytics = () => {
           <Spinner size="xl" />
         </div>
       ) : !summary || summary.total_frames === 0 ? (
-        <Card className="bg-gray-800 border-gray-700">
+        <Card className="bg-elevated border-elevated-border shadow-md">
           <p className="text-gray-300">
             No emotion data yet for this video. Recordings are analyzed daily at 12:00 PM
             (BD time), or click <span className="font-medium">Run analysis now</span> to
@@ -265,7 +275,7 @@ const DetailedAnalytics = () => {
       ) : (
         <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="bg-gray-800 border-gray-700">
+            <Card className="bg-elevated border-elevated-border shadow-md">
               <h3 className="text-lg font-medium text-white mb-4">Overall Reaction Mix</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
@@ -286,7 +296,7 @@ const DetailedAnalytics = () => {
               </ResponsiveContainer>
             </Card>
 
-            <Card className="bg-gray-800 border-gray-700">
+            <Card className="bg-elevated border-elevated-border shadow-md">
               <h3 className="text-lg font-medium text-white mb-4">Engagement Over Time</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={timeline}>
@@ -312,24 +322,28 @@ const DetailedAnalytics = () => {
           </div>
 
           {segments && (
-            <Card className="bg-gray-800 border-gray-700">
+            <Card className="bg-elevated border-elevated-border shadow-md">
               <h3 className="text-lg font-medium text-white mb-4 flex items-center">
                 <Activity size={18} className="mr-2" /> Best / Worst {WINDOW_SECONDS}s Segments
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="p-4 rounded-lg bg-green-900/30 border border-green-700">
                   <p className="text-green-300 font-medium">Most positive</p>
-                  <p className="text-white">{segments.best.label} — {(segments.best.happy * 100).toFixed(0)}% happy</p>
+                  <p className="text-white text-sm mt-1">{segments.best.label} — {(segments.best.happy * 100).toFixed(0)}% happy</p>
                 </div>
                 <div className="p-4 rounded-lg bg-red-900/30 border border-red-700">
                   <p className="text-red-300 font-medium">Least positive</p>
-                  <p className="text-white">{segments.worst.label} — {(segments.worst.happy * 100).toFixed(0)}% happy</p>
+                  <p className="text-white text-sm mt-1">{segments.worst.label} — {(segments.worst.happy * 100).toFixed(0)}% happy
+                    {segments.worst.negative !== undefined && (
+                      <span className="text-red-400"> / {(segments.worst.negative * 100).toFixed(0)}% negative</span>
+                    )}
+                  </p>
                 </div>
               </div>
             </Card>
           )}
 
-          <Card className="bg-gray-800 border-gray-700">
+          <Card className="bg-elevated border-elevated-border shadow-md">
             <h3 className="text-lg font-medium text-white mb-4 flex items-center">
               <UserRound size={18} className="mr-2" /> Per-Person Breakdown
               <span className="ml-2 text-sm text-gray-400 font-normal">
@@ -355,7 +369,7 @@ const DetailedAnalytics = () => {
                     const topLabel = EMOTIONS.find(e => e.key === top?.[0])?.label || top?.[0];
                     return (
                       <React.Fragment key={r.recording_id}>
-                        <Table.Row className="bg-gray-800 border-gray-700">
+                        <Table.Row className="bg-elevated border-elevated-border hover:bg-surface-600 [&:hover>td]:bg-surface-600 [&>td]:bg-elevated transition-colors">
                           <Table.Cell className="text-white">
                             <div className="flex flex-col">
                               <span className="text-sm font-medium">{r.filename || `Recording #${r.recording_id}`}</span>
@@ -368,10 +382,10 @@ const DetailedAnalytics = () => {
                                 src={r.thumbnail_url}
                                 alt={r.filename}
                                 loading="lazy"
-                                className="w-16 h-10 object-cover rounded border border-gray-600"
+                                className="w-16 h-10 object-cover rounded border border-elevated-border"
                               />
                             ) : (
-                              <div className="w-16 h-10 bg-gray-700 rounded flex items-center justify-center border border-gray-600">
+                              <div className="w-16 h-10 bg-surface-600 rounded flex items-center justify-center border border-elevated-border">
                                 <VideoIcon size={16} className="text-gray-500" />
                               </div>
                             )}
@@ -414,7 +428,7 @@ const DetailedAnalytics = () => {
                           </Table.Cell>
                         </Table.Row>
                         {expanded === r.recording_id && (
-                          <Table.Row className="bg-gray-900 border-gray-700">
+                          <Table.Row className="bg-surface border-elevated-border [&>td]:bg-surface">
                             <Table.Cell colSpan={5}>
                               <ResponsiveContainer width="100%" height={220}>
                                 <LineChart data={r.timeline || []}>
@@ -450,11 +464,11 @@ const DetailedAnalytics = () => {
       )}
 
       {/* Delete confirmation modal */}
-      <Modal show={!!deleteTarget} onClose={() => !deleting && setDeleteTarget(null)}>
-        <Modal.Header className="bg-gray-800 text-white border-b border-gray-700">
-          Delete Recording
+      <Modal show={!!deleteTarget} onClose={() => !deleting && setDeleteTarget(null)} theme={{ content: { inner: 'relative flex max-h-[90dvh] flex-col rounded-lg bg-elevated shadow' } }}>
+        <Modal.Header className="bg-elevated text-white border-b border-elevated-border rounded-t-xl">
+          <span className="text-white">Delete Recording</span>
         </Modal.Header>
-        <Modal.Body className="bg-gray-800 text-white">
+        <Modal.Body className="bg-elevated text-white">
           <p className="mb-2">Are you sure you want to delete this recording?</p>
           {deleteTarget && (
             <p className="text-gray-400 text-sm mb-4">
@@ -463,13 +477,13 @@ const DetailedAnalytics = () => {
           )}
           <p className="text-red-400 text-sm">This action cannot be undone. All emotion analysis data for this recording will also be removed.</p>
         </Modal.Body>
-        <Modal.Footer className="bg-gray-800 border-t border-gray-700">
-          <Button color="failure" onClick={handleDeleteRecording} disabled={deleting}>
+        <Modal.Footer className="bg-elevated border-t border-elevated-border">
+          <button onClick={handleDeleteRecording} disabled={deleting} className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50" type="button">
             {deleting ? 'Deleting...' : 'Delete Permanently'}
-          </Button>
-          <Button color="gray" onClick={() => !deleting && setDeleteTarget(null)}>
+          </button>
+          <button onClick={() => !deleting && setDeleteTarget(null)} className="px-4 py-2 text-sm font-medium text-gray-300 bg-surface-600 hover:bg-surface-500 rounded-lg transition-colors" type="button">
             Cancel
-          </Button>
+          </button>
         </Modal.Footer>
       </Modal>
     </div>
@@ -480,23 +494,40 @@ function computeSegments(timeline) {
   if (!timeline || timeline.length === 0) return null;
 
   const byT = [...timeline].sort((a, b) => a.t - b.t);
+  if (byT.length < 2) return null;
+
+  const negativeEmotions = ['sad', 'angry', 'fear', 'disgust'];
   const windowed = [];
+
   for (let i = 0; i < byT.length; i++) {
     const start = byT[i].t;
     const end = start + WINDOW_SECONDS;
     const slice = byT.filter(p => p.t >= start && p.t <= end);
     if (slice.length === 0) continue;
+
     const happy = slice.reduce((s, p) => s + (p.happy || 0), 0) / slice.length;
-    windowed.push({ start, end, happy, slice });
+    const negative = slice.reduce(
+      (s, p) => s + negativeEmotions.reduce((sum, k) => sum + (p[k] || 0), 0),
+      0
+    ) / slice.length;
+
+    windowed.push({ start, end, happy, negative, slice });
   }
+
   if (windowed.length === 0) return null;
 
-  const best = windowed.reduce((a, b) => (b.happy > a.happy ? b : a));
-  const worst = windowed.reduce((a, b) => (b.happy < a.happy ? b : a));
+  const best = windowed.reduce((a, b) =>
+    b.happy > a.happy ? b : a
+  );
+  const worst = windowed.reduce((a, b) => {
+    const aScore = a.happy - a.negative;
+    const bScore = b.happy - b.negative;
+    return bScore < aScore ? b : a;
+  });
 
   return {
     best: { label: `${best.start}s – ${best.end}s`, happy: best.happy },
-    worst: { label: `${worst.start}s – ${worst.end}s`, happy: worst.happy },
+    worst: { label: `${worst.start}s – ${worst.end}s`, happy: worst.happy, negative: worst.negative },
   };
 }
 

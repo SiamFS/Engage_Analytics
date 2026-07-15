@@ -14,8 +14,10 @@ from api.models import (
     VideoEmotionSummary,
     AnalysisRunLog,
     EMOTION_CLASSES,
+    User,
 )
 from api.services.webcam_upload_service import WebcamUploadService
+from api.services.notification_service import NotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +34,8 @@ class EmotionAnalysisService:
 
         run_log = AnalysisRunLog.objects.create(trigger=trigger, status="running", total=0)
         affected_videos = set()
+        completed_count = 0
+        failed_count = 0
 
         try:
             candidates = cls._claim_recordings(statuses)
@@ -47,6 +51,15 @@ class EmotionAnalysisService:
                     recording.analysis_error = None
                     recording.save(update_fields=["analysis_status", "analysis_error"])
                     affected_videos.add(recording.video_id)
+                    completed_count += 1
+
+                    NotificationService.create_notification(
+                        recipient=recording.recorder,
+                        notification_type="recording_analyzed",
+                        title="Your recording has been analyzed",
+                        message=f"Emotion analysis completed for your recording of \"{recording.video.title}\".",
+                        data={"recording_id": recording.id, "video_id": recording.video_id},
+                    )
                 except Exception as exc:
                     logger.error(
                         f"Emotion analysis failed for recording {recording.id}: {exc}",
@@ -55,6 +68,7 @@ class EmotionAnalysisService:
                     recording.analysis_status = "failed"
                     recording.analysis_error = str(exc)[:2000]
                     recording.save(update_fields=["analysis_status", "analysis_error"])
+                    failed_count += 1
                 processed += 1
                 run_log.processed = processed
                 run_log.save(update_fields=["processed"])
@@ -70,6 +84,13 @@ class EmotionAnalysisService:
         finally:
             run_log.finished_at = timezone.now()
             run_log.save(update_fields=["status", "error", "finished_at"])
+
+        NotificationService.notify_admins(
+            notification_type="analysis_run_completed",
+            title=f"Analysis run {run_log.status}",
+            message=f"Emotion analysis run completed: {completed_count} succeeded, {failed_count} failed (trigger: {trigger}).",
+            data={"run_log_id": run_log.id, "completed": completed_count, "failed": failed_count, "trigger": trigger},
+        )
 
         return run_log
 
@@ -103,102 +124,97 @@ class EmotionAnalysisService:
 
     @classmethod
     def _process_recording(cls, recording: WebcamRecording) -> None:
-        video_bytes = cls._download_recording(recording)
-        if not video_bytes or len(video_bytes) == 0:
+        import os
+
+        video_path = cls._download_recording(recording)
+        if not video_path:
             raise ValueError("Recording blob is empty or missing")
 
-        frame_rate = int(getattr(settings, "ANALYSIS_FRAME_RATE", 1) or 1)
-        frames = cls._extract_faces(video_bytes, frame_rate)
+        try:
+            frame_rate = int(getattr(settings, "ANALYSIS_FRAME_RATE", 1) or 1)
+            frames = cls._extract_faces(video_path, frame_rate)
 
-        EmotionFrame.objects.filter(recording=recording).delete()
+            EmotionFrame.objects.filter(recording=recording).delete()
 
-        if not frames:
-            return
+            if not frames:
+                return
 
-        to_create = []
-        for t_seconds, face_image in frames:
-            raw = cls._classify_face(face_image)
-            emotions = cls._normalize_emotions(raw)
-            dominant = max(emotions, key=emotions.get)
-            to_create.append(
-                EmotionFrame(
-                    recording=recording,
-                    video=recording.video,
-                    viewer=recording.recorder,
-                    t_seconds=t_seconds,
-                    angry=emotions["angry"],
-                    disgust=emotions["disgust"],
-                    fear=emotions["fear"],
-                    happy=emotions["happy"],
-                    neutral=emotions["neutral"],
-                    sad=emotions["sad"],
-                    surprise=emotions["surprise"],
-                    dominant=dominant,
-                    confidence=emotions[dominant],
+            to_create = []
+            for t_seconds, face_image in frames:
+                raw = cls._classify_face(face_image)
+                emotions = cls._normalize_emotions(raw)
+                dominant = max(emotions, key=emotions.get)
+                to_create.append(
+                    EmotionFrame(
+                        recording=recording,
+                        video=recording.video,
+                        viewer=recording.recorder,
+                        t_seconds=t_seconds,
+                        angry=emotions["angry"],
+                        disgust=emotions["disgust"],
+                        fear=emotions["fear"],
+                        happy=emotions["happy"],
+                        neutral=emotions["neutral"],
+                        sad=emotions["sad"],
+                        surprise=emotions["surprise"],
+                        dominant=dominant,
+                        confidence=emotions[dominant],
+                    )
                 )
-            )
-        EmotionFrame.objects.bulk_create(to_create, batch_size=100)
+            EmotionFrame.objects.bulk_create(to_create, batch_size=100)
 
-        WebcamUploadService.generate_thumbnail(recording.id, video_bytes)
+            WebcamUploadService.generate_thumbnail(recording.id, video_path=video_path)
+        finally:
+            try:
+                os.unlink(video_path)
+            except OSError:
+                pass
 
     @classmethod
-    def _download_recording(cls, recording: WebcamRecording) -> Optional[bytes]:
+    def _download_recording(cls, recording: WebcamRecording) -> Optional[str]:
         from api.services.azure_storage_service import AzureStorageService
 
-        return AzureStorageService.download_blob_from_url(recording.recording_url)
+        return AzureStorageService.download_blob_to_tempfile(recording.recording_url)
 
     @classmethod
     def _extract_faces(
-        cls, video_bytes: bytes, frame_rate: int
+        cls, video_path: str, frame_rate: int
     ) -> List[Tuple[float, "PIL.Image.Image"]]:
         import cv2
         from PIL import Image
 
         results = []
-        tmp = tempfile.NamedTemporaryFile(suffix=".webm", delete=False)
-        try:
-            tmp.write(video_bytes)
-            tmp.flush()
-            tmp.close()
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            raise ValueError("Unable to open recording for decoding")
 
-            cap = cv2.VideoCapture(tmp.name)
-            if not cap.isOpened():
-                raise ValueError("Unable to open recording for decoding")
+        fps = cap.get(cv2.CAP_PROP_FPS) or 0
+        total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        src_fps = fps if fps > 0 else frame_rate
+        step = max(1, int(round(src_fps / max(1, frame_rate))))
+        max_frames = int(getattr(settings, "ANALYSIS_MAX_FRAMES", MAX_FRAMES) or MAX_FRAMES)
 
-            fps = cap.get(cv2.CAP_PROP_FPS) or 0
-            total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
-            src_fps = fps if fps > 0 else frame_rate
-            step = max(1, int(round(src_fps / max(1, frame_rate))))
-            max_frames = int(getattr(settings, "ANALYSIS_MAX_FRAMES", MAX_FRAMES) or MAX_FRAMES)
-
-            frame_idx = 0
-            kept = 0
-            detector = cls._face_detector()
-            while True:
-                if kept >= max_frames:
-                    break
-                ret, frame = cap.read()
-                if not ret:
-                    break
-                if frame_idx % step == 0:
-                    face = cls._crop_largest_face(frame, detector)
-                    if face is not None:
-                        rgb = cv2.cvtColor(face, cv2.COLOR_BGR2RGB)
-                        img = Image.fromarray(rgb).resize((224, 224))
-                        t_seconds = round(frame_idx / src_fps, 2)
-                        results.append((t_seconds, img))
-                        kept += 1
-                frame_idx += 1
-                if total and frame_idx >= total:
-                    break
-            cap.release()
-        finally:
-            try:
-                import os
-
-                os.unlink(tmp.name)
-            except OSError:
-                pass
+        frame_idx = 0
+        kept = 0
+        detector = cls._face_detector()
+        while True:
+            if kept >= max_frames:
+                break
+            ret, frame = cap.read()
+            if not ret:
+                break
+            if frame_idx % step == 0:
+                face = cls._crop_largest_face(frame, detector)
+                if face is not None:
+                    rgb = cv2.cvtColor(face, cv2.COLOR_BGR2RGB)
+                    img = Image.fromarray(rgb).resize((224, 224))
+                    t_seconds = round(frame_idx / src_fps, 2)
+                    results.append((t_seconds, img))
+                    kept += 1
+            frame_idx += 1
+            if total and frame_idx >= total:
+                break
+        cap.release()
 
         return results
 

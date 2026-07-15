@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button } from 'flowbite-react';
-import { ThumbsUp, ArrowLeft } from 'lucide-react';
+import { ThumbsUp, ArrowLeft, Eye, Play, Heart } from 'lucide-react';
 import VideoService from '../../../../utils/VideoService';
+import getPlaceholderImage from '../../../../utils/getPlaceholderImage';
 import { LoadingState, ErrorState, EmptyState } from '../../../Shared/VideoLoadingStates/VideoLoadingStates';
 import { AuthContext } from '../../../../contexts/AuthProvider/AuthProvider';
 
@@ -14,7 +14,7 @@ const UserLikedVideo = () => {
   const { user } = useContext(AuthContext);
   
   useEffect(() => {
-    if (!user || user.role !== 'user') {
+    if (!user) {
       navigate('/dashboard');
     }
   }, [user, navigate]);
@@ -63,57 +63,56 @@ const UserLikedVideo = () => {
   }
   
   return (
-    <div className="max-w-6xl mx-auto p-4 space-y-8">
-      <div className="flex items-center justify-between mb-6">
+    <div className="max-w-6xl mx-auto px-3 py-6 space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-white flex items-center">
-            <ThumbsUp className="mr-2 text-blue-400" size={30} />
+          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-purple-600/20">
+              <Heart size={20} className="text-purple-400" fill="currentColor" />
+            </div>
             Your Liked Videos
           </h1>
-          <p className="text-2xl font-semibold text-gray-300 mt-2">
-            Total: {likedVideos.length} videos
-          </p>
+          <p className="text-sm text-gray-400 mt-1">{likedVideos.length} {likedVideos.length === 1 ? 'video' : 'videos'}</p>
         </div>
-        <Button color="gray" size="sm" onClick={handleBack}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Dashboard
-        </Button>
+        <button onClick={handleBack} className="inline-flex items-center gap-2 px-3 py-2 text-sm text-gray-300 bg-surface-600 hover:bg-surface-500 rounded-lg transition-colors self-start" type="button">
+          <ArrowLeft size={15} />
+          Back
+        </button>
       </div>
       
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
         {likedVideos.map(video => (
           <button 
             key={video.id} 
-            className="bg-gray-800 rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-700 hover:bg-gray-700/60 cursor-pointer w-full text-left"
+            className="group bg-elevated hover:bg-surface-600 rounded-xl border border-elevated-border hover:border-white/10 transition-all duration-200 hover:-translate-y-0.5 overflow-hidden w-full text-left shadow-md"
             onClick={() => navigate(`/video/${video.uuid || video.id}`)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                navigate(`/video/${video.uuid || video.id}`);
-              }
-            }}
-            aria-label={`Watch ${video.title}`}
+            type="button"
           >
-            <div className="aspect-video overflow-hidden">
+            <div className="relative aspect-video overflow-hidden">
               <img 
-                src={video.thumbnail_url || '/api/placeholder/400/225'} 
+                src={video.thumbnail_url || getPlaceholderImage(400, 225, video.title)} 
                 alt={video.title}
                 loading="lazy"
-                className="w-full h-full object-cover transition-transform duration-300 hover:scale-110"
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
+              <div className="absolute inset-0 bg-gradient-to-t from-surface/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <div className="w-10 h-10 rounded-full bg-purple-600/90 flex items-center justify-center shadow-lg">
+                  <Play size={18} className="text-white ml-0.5" />
+                </div>
+              </div>
             </div>
-            <div className="p-4">
-              <h3 className="text-white font-semibold text-xl mb-2 line-clamp-1">{video.title}</h3>
-              <p className="text-gray-400 text-base mb-3 line-clamp-2">{video.description}</p>
-              <div className="flex items-center text-gray-500 text-base gap-4">
-                <span className="flex items-center">
-                  <ThumbsUp size={18} className="mr-1 text-blue-400" /> 
-                  {video.likes || 0}
-                </span>
-                <span>
+            <div className="p-3 space-y-2">
+              <h3 className="text-sm font-semibold text-white line-clamp-1 group-hover:text-purple-400 transition-colors">{video.title}</h3>
+              <p className="text-xs text-gray-400 line-clamp-2 leading-relaxed">{video.description || ''}</p>
+              <div className="flex items-center text-gray-500 text-[11px] gap-3 pt-0.5">
+                <span className="flex items-center gap-1">
+                  <Eye size={11} />
                   {video.views || 0} views
                 </span>
-                <span>
+                <span className="flex items-center gap-1">
+                  <Heart size={11} className="text-purple-400" fill="currentColor" />
+                  {video.likes || 0}
                 </span>
               </div>
             </div>

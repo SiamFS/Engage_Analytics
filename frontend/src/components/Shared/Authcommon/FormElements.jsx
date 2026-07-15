@@ -3,10 +3,6 @@ import { motion } from 'framer-motion';
 import { Eye, EyeOff } from 'lucide-react';
 import PropTypes from 'prop-types';
 
-/**
- * Reusable form input component with responsive design
- * Adapts to different screen sizes and provides proper feedback
- */
 export const FormInput = ({ 
   id, 
   label, 
@@ -36,7 +32,7 @@ export const FormInput = ({
       onBlur={onBlur}
       placeholder={placeholder}
       autoComplete={autoComplete}
-      className="w-full min-w-0 px-3 sm:px-4 py-2 sm:py-2.5 bg-gray-700/50 border border-gray-600 rounded-[12px] sm:rounded-[14px] shadow-sm text-white text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+      className="w-full min-w-0 px-3 sm:px-4 py-2 sm:py-2.5 bg-surface-600 border border-elevated-border rounded-lg shadow-sm text-white text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
       required={required}
       aria-required={required}
       aria-invalid={helperText?.includes('error')}
@@ -77,10 +73,6 @@ FormInput.defaultProps = {
   autoComplete: 'on'
 };
 
-/**
- * Password input component with toggle visibility
- * Fully responsive and accessible
- */
 export const PasswordInput = ({ 
   id, 
   label, 
@@ -112,7 +104,7 @@ export const PasswordInput = ({
         onBlur={onBlur}
         placeholder={placeholder}
         autoComplete={autoComplete}
-        className="w-full min-w-0 px-3 sm:px-4 py-2 sm:py-2.5 bg-gray-700/50 border border-gray-600 rounded-[12px] sm:rounded-[14px] shadow-sm text-white text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors pr-10"
+        className="w-full min-w-0 px-3 sm:px-4 py-2 sm:py-2.5 bg-surface-600 border border-elevated-border rounded-lg shadow-sm text-white text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors pr-10"
         required={required}
         aria-required={required}
         aria-invalid={helperText?.includes('error')}
@@ -121,7 +113,7 @@ export const PasswordInput = ({
       <button
         type="button"
         onClick={() => setShowPassword(!showPassword)}
-        className="absolute right-2.5 sm:right-3.5 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full p-1"
+        className="absolute right-2.5 sm:right-3.5 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 rounded-full p-1"
         aria-label={showPassword ? "Hide password" : "Show password"}
         tabIndex={0}
       >
@@ -163,10 +155,6 @@ PasswordInput.defaultProps = {
   autoComplete: 'current-password'
 };
 
-/**
- * Submit button component with loading state
- * Animates on hover and press
- */
 export const SubmitButton = ({ text, loadingText, loading, disabled }) => (
   <motion.button
     type="submit"
@@ -176,9 +164,9 @@ export const SubmitButton = ({ text, loadingText, loading, disabled }) => (
     whileTap={{ scale: 0.98 }}
     transition={{ duration: 0.2 }}
   >
-    <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-blue-500 to-blue-700 rounded-[12px] sm:rounded-[14px] shadow-md" />
-    <span className="absolute inset-0 w-full h-full bg-white/10 rounded-[12px] sm:rounded-[14px] blur-[1px]" />
-    <span className="absolute inset-0 w-full h-full bg-blue-600 rounded-[12px] sm:rounded-[14px] transform transition-transform group-hover:scale-[1.02] group-hover:brightness-110" />
+    <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-brand-500 to-brand-700 rounded-lg shadow-md" />
+    <span className="absolute inset-0 w-full h-full bg-white/10 rounded-lg blur-[1px]" />
+    <span className="absolute inset-0 w-full h-full bg-brand-600 rounded-lg transform transition-transform group-hover:scale-[1.02] group-hover:brightness-110" />
     <span className="relative flex items-center justify-center text-white font-medium py-2 sm:py-2.5 text-sm">
       {loading ? (
         <div className="flex items-center">
@@ -204,12 +192,13 @@ SubmitButton.defaultProps = {
   loading: false,
   disabled: false
 };
+
 export const SocialButton = ({ onClick, icon, text, disabled, className }) => (
   <motion.button
     type="button"
     onClick={onClick}
     disabled={disabled}
-    className={`w-full flex items-center justify-center py-2 sm:py-2.5 px-3 sm:px-4 border border-gray-600 rounded-[12px] sm:rounded-[14px] shadow-md text-xs sm:text-sm font-medium text-white bg-gray-700/50 hover:bg-gray-700/70 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50 transition-colors ${className || ''}`}
+    className={`w-full flex items-center justify-center py-2 sm:py-2.5 px-3 sm:px-4 border border-elevated-border rounded-lg shadow-md text-xs sm:text-sm font-medium text-white bg-surface-600 hover:bg-surface-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:opacity-50 transition-colors ${className || ''}`}
     whileHover={{ scale: 1.02 }}
     whileTap={{ scale: 0.98 }}
     transition={{ duration: 0.2 }}

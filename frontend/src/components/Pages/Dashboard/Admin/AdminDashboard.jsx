@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Card, Button, Spinner, Alert, Badge } from 'flowbite-react';
-import { BarChart2, Upload, VideoIcon, ArrowRight, Play, Activity } from 'lucide-react';
+import { Button, Spinner, Alert, Badge } from 'flowbite-react';
+import { BarChart2, Upload, VideoIcon, ArrowRight, Activity, Film, Camera, ClipboardList, Star, MessageSquareText } from 'lucide-react';
 import VideoService from '../../../../utils/VideoService';
+import FeedbackService from '../../../../utils/FeedbackService';
 import { useNavigate } from 'react-router-dom';
 import { StatsCard } from '../../../Shared/DashboardComponents/DashboardComponents';
 
@@ -16,20 +17,15 @@ const AdminDashboard = () => {
   const [statsLoading, setStatsLoading] = useState(true);
 
   const [runStatus, setRunStatus] = useState(null);
-  const [isRunning, setIsRunning] = useState(false);
+  const [feedbackAnalytics, setFeedbackAnalytics] = useState(null);
 
   const navigate = useNavigate();
   const isMounted = useRef(true);
-  const pollTimerRef = useRef(null);
 
   useEffect(() => {
     isMounted.current = true;
     return () => {
       isMounted.current = false;
-      if (pollTimerRef.current) {
-        clearInterval(pollTimerRef.current);
-        pollTimerRef.current = null;
-      }
     };
   }, []);
 
@@ -44,14 +40,13 @@ const AdminDashboard = () => {
         let videos = [];
         let recordings = [];
 
-        const requests = [
+        const [videosResponse, recordingsResponse, statsResponse, statusResponse, feedbackResponse] = await Promise.allSettled([
           VideoService.adminGetAllVideos(),
           VideoService.adminGetWebcamRecordings(),
           VideoService.adminGetVideoStats(),
           VideoService.getEmotionAnalysisStatus(),
-        ];
-
-        const [videosResponse, recordingsResponse, statsResponse, statusResponse] = await Promise.allSettled(requests);
+          FeedbackService.adminGetFeedbackAnalytics(),
+        ]);
 
         if (videosResponse.status === 'fulfilled' && Array.isArray(videosResponse.value)) {
           videos = videosResponse.value;
@@ -78,9 +73,10 @@ const AdminDashboard = () => {
 
         if (statusResponse.status === 'fulfilled' && statusResponse.value) {
           setRunStatus(statusResponse.value);
-          if (statusResponse.value.status === 'running') {
-            setIsRunning(true);
-          }
+        }
+
+        if (feedbackResponse.status === 'fulfilled' && feedbackResponse.value) {
+          setFeedbackAnalytics(feedbackResponse.value);
         }
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
@@ -97,39 +93,6 @@ const AdminDashboard = () => {
     fetchDashboardData();
   }, [fetchAttempted]);
 
-  const handleRunAnalysis = async () => {
-    if (isRunning) return;
-    setIsRunning(true);
-    setError(null);
-    try {
-      await VideoService.runEmotionAnalysis();
-      const timer = setInterval(async () => {
-        try {
-          if (!isMounted.current) { clearInterval(timer); return; }
-          const statusData = await VideoService.getEmotionAnalysisStatus();
-          setRunStatus(statusData);
-          if (statusData?.status !== 'running') {
-            clearInterval(timer);
-            pollTimerRef.current = null;
-            setIsRunning(false);
-          }
-        } catch (err) {
-          console.error('Error polling analysis status:', err);
-          clearInterval(timer);
-          pollTimerRef.current = null;
-          setIsRunning(false);
-        }
-      }, 3000);
-      pollTimerRef.current = timer;
-    } catch (err) {
-      console.error('Error starting emotion analysis:', err);
-      if (isMounted.current) {
-        setError(err.message || 'Failed to start analysis');
-        setIsRunning(false);
-      }
-    }
-  };
-
   const [isMobile, setIsMobile] = useState(window.innerWidth < 640);
 
   useEffect(() => {
@@ -142,11 +105,11 @@ const AdminDashboard = () => {
   }, []);
 
   const statusBadge = () => {
-    if (!runStatus) return <Badge color="gray">Never run</Badge>;
-    if (runStatus.status === 'running') return <Badge color="warning" className="animate-pulse">Running</Badge>;
-    if (runStatus.status === 'done') return <Badge color="success">Completed</Badge>;
-    if (runStatus.status === 'failed') return <Badge color="failure">Failed</Badge>;
-    return <Badge color="gray">Idle</Badge>;
+    if (!runStatus) return <Badge color="gray" className="!bg-surface-600 !text-gray-300">Never run</Badge>;
+    if (runStatus.status === 'running') return <Badge color="warning" className="animate-pulse !bg-yellow-600/40 !text-yellow-300">Running</Badge>;
+    if (runStatus.status === 'done') return <Badge color="success" className="!bg-green-600/40 !text-green-300">Completed</Badge>;
+    if (runStatus.status === 'failed') return <Badge color="failure" className="!bg-red-600/40 !text-red-300">Failed</Badge>;
+    return <Badge color="gray" className="!bg-surface-600 !text-gray-300">Idle</Badge>;
   };
 
   const progressText =
@@ -157,105 +120,161 @@ const AdminDashboard = () => {
       : 'No runs yet';
 
   return (
-    <div className="space-y-4 md:space-y-6">
-      <div className="mb-4 md:mb-6">
-        <h1 className="text-xl md:text-2xl font-bold text-white mb-1 md:mb-2">Admin Dashboard</h1>
-        <p className="text-sm md:text-base text-gray-400">
+    <div className="space-y-6">
+      <div className="mb-2">
+        <h1 className="text-2xl font-bold text-white mb-1">Admin Dashboard</h1>
+        <p className="text-sm text-gray-400">
           {isMobile ? "Manage platform stats & content" : "View platform statistics and manage your site."}
         </p>
       </div>
 
       {error && (
-        <Alert color="failure" onDismiss={() => setError(null)} className="mb-4">
+        <Alert color="failure" onDismiss={() => setError(null)} className="mb-4 rounded-xl border border-red-800/40">
           {error}
         </Alert>
       )}
 
       {success && (
-        <Alert color="success" onDismiss={() => setSuccess(null)} className="mb-4">
+        <Alert color="success" onDismiss={() => setSuccess(null)} className="mb-4 rounded-xl border border-green-800/40">
           {success}
         </Alert>
       )}
 
       {statsLoading ? (
-        <div className="flex justify-center py-12">
-          <Spinner size="xl" />
+        <div className="flex justify-center py-16">
+          <Spinner size="xl" className="fill-brand-500" />
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <StatsCard
             title="Total Videos"
             value={adminStats.totalVideos}
-            icon={Upload}
+            icon={Film}
             color="blue"
           />
           <StatsCard
             title="Webcam Recordings"
             value={adminStats.totalWebcamRecordings}
-            icon={VideoIcon}
+            icon={Camera}
             color="green"
           />
+          {feedbackAnalytics && (
+            <StatsCard
+              title="Ad Feedback Responses"
+              value={feedbackAnalytics.total_responses}
+              icon={MessageSquareText}
+              color="yellow"
+            />
+          )}
         </div>
       )}
 
-      <Card className="bg-gray-800 border-gray-700">
-        <h2 className="text-xl font-bold text-white mb-4">Quick Actions</h2>
+      <div className="card-base bg-elevated border-elevated-border p-6">
+        <h2 className="text-lg font-bold text-white mb-5">Quick Actions</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Button color="blue" onClick={() => navigate('/dashboard/upload')}>
-            <Upload className="mr-2 h-5 w-5" />
-            Upload New Video
-          </Button>
-          <Button color="purple" onClick={() => navigate('/dashboard/videos')}>
-            <VideoIcon className="mr-2 h-5 w-5" />
-            Manage Videos
-          </Button>
-          <Button color="green" onClick={() => navigate('/dashboard/recorded-videos')}>
-            <VideoIcon className="mr-2 h-5 w-5" />
-            View Webcam Recordings
-          </Button>
-          <Button
-            color="warning"
-            onClick={handleRunAnalysis}
-            disabled={isRunning}
+          <button
+            onClick={() => navigate('/dashboard/upload')}
+            className="flex items-center gap-3 p-4 rounded-xl bg-gradient-to-br from-brand-600/20 to-brand-700/10 border border-brand-600/30 hover:border-brand-500/60 transition-all duration-200 hover:-translate-y-0.5 group"
+            type="button"
           >
-            {isRunning ? (
-              <>
-                <Spinner size="sm" className="mr-2" /> Running…
-              </>
-            ) : (
-              <>
-                <Play size={16} className="mr-2" /> Run Analysis
-              </>
-            )}
-          </Button>
+            <div className="p-2.5 rounded-lg bg-brand-600/20 group-hover:bg-brand-600/30 transition-colors">
+              <Upload size={20} className="text-brand-400" />
+            </div>
+            <span className="text-sm font-medium text-white">Upload Video</span>
+          </button>
+          <button
+            onClick={() => navigate('/dashboard/videos')}
+            className="flex items-center gap-3 p-4 rounded-xl bg-gradient-to-br from-purple-600/20 to-purple-700/10 border border-purple-600/30 hover:border-purple-500/60 transition-all duration-200 hover:-translate-y-0.5 group"
+            type="button"
+          >
+            <div className="p-2.5 rounded-lg bg-purple-600/20 group-hover:bg-purple-600/30 transition-colors">
+              <VideoIcon size={20} className="text-purple-400" />
+            </div>
+            <span className="text-sm font-medium text-white">Manage Videos</span>
+          </button>
+          <button
+            onClick={() => navigate('/dashboard/recorded-videos')}
+            className="flex items-center gap-3 p-4 rounded-xl bg-gradient-to-br from-green-600/20 to-green-700/10 border border-green-600/30 hover:border-green-500/60 transition-all duration-200 hover:-translate-y-0.5 group"
+            type="button"
+          >
+            <div className="p-2.5 rounded-lg bg-green-600/20 group-hover:bg-green-600/30 transition-colors">
+              <Camera size={20} className="text-green-400" />
+            </div>
+            <span className="text-sm font-medium text-white">Recordings</span>
+          </button>
+          <button
+            onClick={() => navigate('detailed-analytics')}
+            className="flex items-center gap-3 p-4 rounded-xl bg-gradient-to-br from-amber-600/20 to-amber-700/10 border border-amber-600/30 hover:border-amber-500/60 transition-all duration-200 hover:-translate-y-0.5 group"
+            type="button"
+          >
+            <div className="p-2.5 rounded-lg bg-amber-600/20 group-hover:bg-amber-600/30 transition-colors">
+              <BarChart2 size={20} className="text-amber-400" />
+            </div>
+            <span className="text-sm font-medium text-white">Emotion Analytics</span>
+          </button>
+          <button
+            onClick={() => navigate('/dashboard/survey')}
+            className="flex items-center gap-3 p-4 rounded-xl bg-gradient-to-br from-yellow-600/20 to-yellow-700/10 border border-yellow-600/30 hover:border-yellow-500/60 transition-all duration-200 hover:-translate-y-0.5 group"
+            type="button"
+          >
+            <div className="p-2.5 rounded-lg bg-yellow-600/20 group-hover:bg-yellow-600/30 transition-colors">
+              <ClipboardList size={20} className="text-yellow-400" />
+            </div>
+            <span className="text-sm font-medium text-white">Survey Management</span>
+          </button>
         </div>
-      </Card>
+      </div>
 
-      <Card className="bg-gray-800 border-gray-700">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <h2 className="text-xl font-bold text-white flex items-center">
-            <Activity className="mr-2 text-blue-400" size={24} />
+      <div className="card-base bg-elevated border-elevated-border p-6">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <h2 className="text-lg font-bold text-white flex items-center gap-2.5">
+            <div className="p-2 rounded-lg bg-brand-600/20">
+              <Activity size={18} className="text-brand-400" />
+            </div>
             Emotion Analysis
           </h2>
           <div className="flex items-center gap-3">
             {statusBadge()}
-            <span className="text-sm text-gray-400">{progressText}</span>
-            <Button color="blue" size="sm" onClick={() => navigate('detailed-analytics')}>
-              View Detailed Analytics <ArrowRight className="ml-2 h-4 w-4" />
+            <span className="text-xs text-gray-400">{progressText}</span>
+            <Button color="blue" size="xs" onClick={() => navigate('detailed-analytics')} className="bg-brand-600 hover:bg-brand-700 focus:ring-0">
+              Detailed <ArrowRight className="ml-1 h-3 w-3" />
             </Button>
           </div>
         </div>
 
-        <div className="bg-gray-700/50 p-6 rounded-lg text-center">
-          <div className="flex items-center justify-center">
-            <div className="text-gray-400">
-              <BarChart2 size={48} className="mx-auto mb-3 text-gray-500" />
-              <p>Emotion analysis runs daily at 12:00 PM (BD time).</p>
-              <p className="text-sm mt-1">Use <span className="text-yellow-400">Run Analysis</span> above to process pending recordings immediately.</p>
+        {runStatus ? (
+          <div className="bg-surface-600 rounded-xl border border-elevated-border p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-white">{runStatus.processed || 0}</p>
+                <p className="text-xs text-gray-400 mt-1">Recordings Processed</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-white">{runStatus.total || 0}</p>
+                <p className="text-xs text-gray-400 mt-1">Total Recordings</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-white">
+                  {runStatus.finished_at
+                    ? new Date(runStatus.finished_at).toLocaleDateString()
+                    : '\u2014'}
+                </p>
+                <p className="text-xs text-gray-400 mt-1">Last Run</p>
+              </div>
             </div>
           </div>
-        </div>
-      </Card>
+        ) : (
+          <div className="bg-surface-600 rounded-xl border border-elevated-border p-8 text-center">
+            <div className="max-w-md mx-auto">
+              <div className="w-16 h-16 rounded-2xl bg-surface-600 flex items-center justify-center mx-auto mb-4">
+                <BarChart2 size={32} className="text-gray-500" />
+              </div>
+              <p className="text-gray-400 text-sm mb-1">No analysis runs yet.</p>
+              <p className="text-gray-500 text-xs">Go to <span className="text-brand-400 font-medium">Emotion Analytics</span> to trigger your first analysis.</p>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

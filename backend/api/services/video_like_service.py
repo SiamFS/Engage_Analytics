@@ -3,6 +3,7 @@ from django.db.models import F
 from django.shortcuts import get_object_or_404
 
 from api.models import Video, VideoLike
+from api.services.notification_service import NotificationService
 
 class VideoLikeService:
     """Service for handling video like operations"""
@@ -41,6 +42,17 @@ class VideoLikeService:
         video.likes = F("likes") + 1
         video.save(update_fields=["likes"])
         video.refresh_from_db()
+
+        if like.user_id and video.uploader_id != like.user_id:
+            liker_name = like.user.get_full_name() or like.user.email if like.user else "Someone"
+            NotificationService.create_notification(
+                recipient=video.uploader,
+                notification_type="video_liked",
+                title="Your video got a like!",
+                message=f"{liker_name} liked your video \"{video.title}\".",
+                data={"video_id": video.id, "liker_id": like.user_id},
+            )
+
         return video, True, video.likes
     
     @staticmethod

@@ -5,6 +5,7 @@ from typing import Optional, Tuple
 from django.utils import timezone
 from api.models import User, Video, WebcamRecording
 from api.services.azure_storage_service import AzureStorageService
+from api.services.notification_service import NotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -47,13 +48,16 @@ class WebcamUploadService:
             return None
 
     @staticmethod
-    def generate_thumbnail(recording_id: int, video_bytes: Optional[bytes] = None) -> bool:
-        """
-        Generate a thumbnail for a webcam recording from the first frame.
+    def generate_thumbnail(
+        recording_id: int,
+        video_bytes: Optional[bytes] = None,
+        video_path: Optional[str] = None,
+    ) -> bool:
+        import cv2
+        import tempfile
+        import os
+        from PIL import Image
 
-        If video_bytes is provided, use it directly; otherwise download from Azure.
-        Returns True if thumbnail was generated successfully.
-        """
         try:
             recording = WebcamRecording.objects.get(id=recording_id)
         except WebcamRecording.DoesNotExist:
@@ -62,35 +66,44 @@ class WebcamUploadService:
         if recording.thumbnail_url:
             return True
 
-        if video_bytes is None:
-            try:
-                video_bytes = AzureStorageService.download_blob_from_url(recording.recording_url)
-            except Exception as exc:
-                logger.warning(f"Failed to download blob for thumbnail (recording {recording_id}): {exc}")
-                return False
-
-        if not video_bytes or len(video_bytes) == 0:
-            logger.warning(f"Recording {recording_id} blob is empty, cannot generate thumbnail")
-            return False
-
-        import cv2
-        import tempfile
-        import os
-        from PIL import Image
-
-        tmp = tempfile.NamedTemporaryFile(suffix=".webm", delete=False)
+        tmp_path = None
+        cap = None
         try:
-            tmp.write(video_bytes)
-            tmp.flush()
-            tmp.close()
+            source = video_path
+            if not source:
+                if video_bytes:
+                    tmp = tempfile.NamedTemporaryFile(suffix=".webm", delete=False)
+                    tmp_path = tmp.name
+                    tmp.write(video_bytes)
+                    tmp.flush()
+                    tmp.close()
+                    source = tmp_path
+                else:
+                    try:
+                        video_bytes = AzureStorageService.download_blob_from_url(recording.recording_url)
+                    except Exception as exc:
+                        logger.warning(f"Failed to download blob for thumbnail (recording {recording_id}): {exc}")
+                        return False
 
-            cap = cv2.VideoCapture(tmp.name)
+                    if not video_bytes or len(video_bytes) == 0:
+                        logger.warning(f"Recording {recording_id} blob is empty, cannot generate thumbnail")
+                        return False
+
+                    tmp = tempfile.NamedTemporaryFile(suffix=".webm", delete=False)
+                    tmp_path = tmp.name
+                    tmp.write(video_bytes)
+                    tmp.flush()
+                    tmp.close()
+                    source = tmp_path
+
+            cap = cv2.VideoCapture(source)
             if not cap.isOpened():
                 logger.warning(f"OpenCV could not open recording {recording_id} for thumbnail")
                 return False
 
             ret, frame = cap.read()
             cap.release()
+            cap = None
             if not ret or frame is None:
                 logger.warning(f"No frame could be read from recording {recording_id} for thumbnail")
                 return False
@@ -130,10 +143,13 @@ class WebcamUploadService:
             logger.error(f"Thumbnail generation failed for recording {recording_id}: {exc}", exc_info=True)
             return False
         finally:
-            try:
-                os.unlink(tmp.name)
-            except OSError:
-                pass
+            if cap is not None:
+                cap.release()
+            if tmp_path is not None:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
 
     @staticmethod
     def mark_upload_complete(recording_id: int, user: User) -> Optional[WebcamRecording]:
@@ -153,6 +169,14 @@ class WebcamUploadService:
             return None
 
         WebcamUploadService._trigger_thumbnail_async(recording_id)
+
+        NotificationService.create_notification(
+            recipient=user,
+            notification_type="webcam_upload_complete",
+            title="Recording uploaded successfully",
+            message=f"Your webcam recording for \"{recording.video.title}\" has been uploaded and will be analyzed.",
+            data={"recording_id": recording_id, "video_id": recording.video_id},
+        )
 
         return recording
 

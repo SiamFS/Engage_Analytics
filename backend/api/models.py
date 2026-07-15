@@ -526,3 +526,219 @@ class AnalysisRunLog(models.Model):
 
     def __str__(self):
         return f"AnalysisRun {self.trigger} ({self.status}) {self.processed}/{self.total}"
+
+
+class Notification(models.Model):
+    NOTIFICATION_TYPES = [
+        ("video_liked", "Video Liked"),
+        ("webcam_upload_complete", "Webcam Upload Complete"),
+        ("recording_analyzed", "Recording Analyzed"),
+        ("analysis_run_completed", "Analysis Run Completed"),
+        ("points_earned", "Points Earned"),
+        ("video_view_limit_reached", "View Limit Reached"),
+        ("video_auto_privated", "Video Auto-Privated"),
+        ("user_promoted", "User Promoted to Admin"),
+        ("new_user_registered", "New User Registered"),
+        ("system_announcement", "System Announcement"),
+        ("upload_request_submitted", "Upload Request Submitted"),
+        ("upload_request_approved", "Upload Request Approved"),
+        ("upload_request_rejected", "Upload Request Rejected"),
+        ("upload_request_processing", "Upload Request Processing"),
+        ("upload_request_completed", "Upload Request Completed"),
+        ("upload_request_cancelled", "Upload Request Cancelled"),
+        ("upload_request_comment", "Upload Request Comment"),
+    ]
+
+    recipient = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="notifications"
+    )
+    notification_type = models.CharField(max_length=50, choices=NOTIFICATION_TYPES)
+    title = models.CharField(max_length=255)
+    message = models.TextField()
+    data = models.JSONField(default=dict, blank=True)
+    is_read = models.BooleanField(default=False, db_index=True)
+    is_archived = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "notifications"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["recipient", "-created_at"]),
+            models.Index(fields=["recipient", "is_read", "-created_at"]),
+        ]
+
+    def mark_as_read(self):
+        if not self.is_read:
+            self.is_read = True
+            self.read_at = timezone.now()
+            self.save(update_fields=["is_read", "read_at"])
+
+    def __str__(self):
+        return f"{self.notification_type} -> {self.recipient.email}: {self.title}"
+
+
+class UserNotificationPreference(models.Model):
+    DIGEST_CHOICES = [
+        ("instant", "Instant"),
+        ("daily", "Daily"),
+        ("weekly", "Weekly"),
+    ]
+
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name="notification_preferences"
+    )
+    email_notifications = models.BooleanField(default=True)
+    push_notifications = models.BooleanField(default=True)
+    in_app_notifications = models.BooleanField(default=True)
+    marketing_notifications = models.BooleanField(default=False)
+    security_notifications = models.BooleanField(default=True)
+    quiet_hours_start = models.TimeField(null=True, blank=True)
+    quiet_hours_end = models.TimeField(null=True, blank=True)
+    digest_frequency = models.CharField(
+        max_length=20, choices=DIGEST_CHOICES, default="instant"
+    )
+
+    class Meta:
+        db_table = "user_notification_preferences"
+
+    def __str__(self):
+        return f"Notification preferences for {self.user.email}"
+
+
+class SurveyQuestion(models.Model):
+    QUESTION_TYPES = [
+        ("star_rating", "Star Rating"),
+        ("emoji_rating", "Emoji Rating"),
+        ("multiple_choice", "Multiple Choice"),
+        ("checkbox", "Checkbox"),
+        ("text", "Text"),
+    ]
+
+    question_text = models.TextField()
+    question_type = models.CharField(max_length=20, choices=QUESTION_TYPES)
+    options = models.JSONField(default=list, blank=True)
+    order = models.PositiveIntegerField(default=0)
+    is_required = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
+    section = models.CharField(max_length=50, default="general")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "survey_questions"
+        ordering = ["order", "id"]
+
+    def __str__(self):
+        return self.question_text[:80]
+
+
+class FeedbackResponse(models.Model):
+    FEEDBACK_SOURCES = [
+        ("post_analysis", "Post Analysis"),
+        ("manual", "Manual"),
+    ]
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="feedback_responses"
+    )
+    video = models.ForeignKey(
+        Video, on_delete=models.SET_NULL, null=True, blank=True, related_name="feedback_responses"
+    )
+    responses = models.JSONField(default=dict)
+    rating = models.PositiveSmallIntegerField(null=True, blank=True)
+    is_anonymous = models.BooleanField(default=False)
+    is_bug_report = models.BooleanField(default=False)
+    consent_to_improve = models.BooleanField(default=False)
+    source = models.CharField(
+        max_length=50, choices=FEEDBACK_SOURCES, default="post_analysis"
+    )
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "feedback_responses"
+        ordering = ["-submitted_at"]
+        indexes = [
+            models.Index(fields=["user", "video"]),
+            models.Index(fields=["-submitted_at"]),
+        ]
+
+    def __str__(self):
+        return f"Feedback by {self.user.email} on video {self.video_id}"
+
+
+class UploadRequest(models.Model):
+    REQUEST_STATUS_CHOICES = [
+        ("draft", "Draft"),
+        ("submitted", "Submitted"),
+        ("pending_review", "Pending Review"),
+        ("approved", "Approved"),
+        ("rejected", "Rejected"),
+        ("processing", "Processing"),
+        ("completed", "Completed"),
+        ("failed", "Failed"),
+        ("cancelled", "Cancelled"),
+        ("archived", "Archived"),
+    ]
+
+    company = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="upload_requests"
+    )
+    video = models.OneToOneField(
+        Video, on_delete=models.SET_NULL, null=True, blank=True, related_name="upload_request"
+    )
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    category = models.CharField(max_length=100, blank=True)
+    filename = models.CharField(max_length=255, blank=True)
+    status = models.CharField(
+        max_length=20, choices=REQUEST_STATUS_CHOICES, default="draft", db_index=True
+    )
+    admin_comment = models.TextField(blank=True)
+    rejection_reason = models.TextField(blank=True)
+    suggestions = models.TextField(blank=True)
+    reviewed_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name="reviewed_requests"
+    )
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "upload_requests"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["company", "status"]),
+            models.Index(fields=["status", "-created_at"]),
+        ]
+        verbose_name = "Upload Request"
+        verbose_name_plural = "Upload Requests"
+
+    def __str__(self):
+        return f"UploadRequest #{self.id} ({self.title}) by {self.company.email}"
+
+
+class UploadRequestStatusLog(models.Model):
+    upload_request = models.ForeignKey(
+        UploadRequest, on_delete=models.CASCADE, related_name="status_logs"
+    )
+    from_status = models.CharField(max_length=20, null=True, blank=True)
+    to_status = models.CharField(max_length=20)
+    changed_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    comment = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "upload_request_status_logs"
+        ordering = ["created_at"]
+        verbose_name = "Upload Request Status Log"
+        verbose_name_plural = "Upload Request Status Logs"
+
+    def __str__(self):
+        return f"StatusLog: {self.from_status or 'None'} -> {self.to_status} (Request #{self.upload_request_id})"

@@ -25,6 +25,11 @@ from api.views import (
     MyEmotionView,
     UserWebcamRecordingsView,
     HealthCheckView,
+    UploadRequestListCreateView,
+    UploadRequestDetailView,
+    UploadRequestSubmitView,
+    UploadRequestCancelView,
+    CompanyAnalyticsView,
 )
 from api.admin_views import (
     UserSearchView,
@@ -33,6 +38,39 @@ from api.admin_views import (
     VideoStatsView,
     WebcamRecordingsView,
     DeleteWebcamRecordingView,
+    AdminPointsView,
+    AdminUploadRequestListView,
+    AdminUploadRequestDetailView,
+    AdminUploadRequestApproveView,
+    AdminUploadRequestRejectView,
+    AdminUploadRequestArchiveView,
+    AdminUserManagementView,
+    AdminUserDetailView,
+    AdminUserActivateView,
+    AdminUserDeactivateView,
+    AdminUserBulkActionView,
+    AdminCompanyListView,
+)
+from api.feedback_views import (
+    ActiveSurveyQuestionsView,
+    AdminSurveyQuestionsView,
+    AdminSurveyReorderView,
+    SubmitFeedbackView,
+    FeedbackPendingCheckView,
+    UserFeedbackHistoryView,
+    AdminFeedbackListView,
+    AdminFeedbackDetailView,
+    FeedbackAnalyticsView,
+)
+from api.notification_views import (
+    UnreadNotificationCountView,
+    NotificationListView,
+    NotificationMarkReadView,
+    NotificationMarkAllReadView,
+    NotificationDeleteView,
+    NotificationArchiveView,
+    NotificationPreferenceView,
+    AdminNotificationListView,
 )
 
 urlpatterns = [
@@ -143,6 +181,82 @@ urlpatterns = [
         MyEmotionView.as_view(),
         name="video-my-emotion",
     ),
+    # Notification endpoints
+    path(
+        "notifications/unread-count/",
+        UnreadNotificationCountView.as_view(),
+        name="notification-unread-count",
+    ),
+    path(
+        "notifications/",
+        NotificationListView.as_view(),
+        name="notification-list",
+    ),
+    path(
+        "notifications/<int:notification_id>/read/",
+        NotificationMarkReadView.as_view(),
+        name="notification-mark-read",
+    ),
+    path(
+        "notifications/read-all/",
+        NotificationMarkAllReadView.as_view(),
+        name="notification-mark-all-read",
+    ),
+    path(
+        "notifications/<int:notification_id>/",
+        NotificationDeleteView.as_view(),
+        name="notification-delete",
+    ),
+    path(
+        "notifications/<int:notification_id>/archive/",
+        NotificationArchiveView.as_view(),
+        name="notification-archive",
+    ),
+    path(
+        "notification-preferences/",
+        NotificationPreferenceView.as_view(),
+        name="notification-preferences",
+    ),
+    # Admin notification management
+    path(
+        "admin/notifications/",
+        AdminNotificationListView.as_view(),
+        name="admin-notification-list",
+    ),
+    # Admin points
+    path("admin/points/", AdminPointsView.as_view(), name="admin-points"),
+    # Feedback endpoints
+    path("feedback/questions/", ActiveSurveyQuestionsView.as_view(), name="active-survey-questions"),
+    path("feedback/submit/", SubmitFeedbackView.as_view(), name="submit-feedback"),
+    path("feedback/pending/", FeedbackPendingCheckView.as_view(), name="feedback-pending"),
+    path("feedback/history/", UserFeedbackHistoryView.as_view(), name="user-feedback-history"),
+    path("admin/feedback/questions/", AdminSurveyQuestionsView.as_view(), name="admin-survey-questions"),
+    path("admin/feedback/questions/<int:question_id>/", AdminSurveyQuestionsView.as_view(), name="admin-survey-question-detail"),
+    path("admin/feedback/questions/reorder/", AdminSurveyReorderView.as_view(), name="admin-survey-reorder"),
+    path("admin/feedback/", AdminFeedbackListView.as_view(), name="admin-feedback-list"),
+    path("admin/feedback/<int:feedback_id>/", AdminFeedbackDetailView.as_view(), name="admin-feedback-detail"),
+    path("admin/feedback/analytics/", FeedbackAnalyticsView.as_view(), name="admin-feedback-analytics"),
     # Health check
     path("health/", HealthCheckView.as_view(), name="health-check"),
+    # Upload request endpoints (company + admin)
+    path("upload-requests/", UploadRequestListCreateView.as_view(), name="upload-request-list-create"),
+    path("upload-requests/<int:request_id>/", UploadRequestDetailView.as_view(), name="upload-request-detail"),
+    path("upload-requests/<int:request_id>/submit/", UploadRequestSubmitView.as_view(), name="upload-request-submit"),
+    path("upload-requests/<int:request_id>/cancel/", UploadRequestCancelView.as_view(), name="upload-request-cancel"),
+    # Company analytics
+    path("company/analytics/", CompanyAnalyticsView.as_view(), name="company-analytics"),
+    # Admin upload request management
+    path("admin/upload-requests/", AdminUploadRequestListView.as_view(), name="admin-upload-request-list"),
+    path("admin/upload-requests/<int:request_id>/", AdminUploadRequestDetailView.as_view(), name="admin-upload-request-detail"),
+    path("admin/upload-requests/<int:request_id>/approve/", AdminUploadRequestApproveView.as_view(), name="admin-upload-request-approve"),
+    path("admin/upload-requests/<int:request_id>/reject/", AdminUploadRequestRejectView.as_view(), name="admin-upload-request-reject"),
+    path("admin/upload-requests/<int:request_id>/archive/", AdminUploadRequestArchiveView.as_view(), name="admin-upload-request-archive"),
+    # Admin user management
+    path("admin/users/", AdminUserManagementView.as_view(), name="admin-user-list"),
+    path("admin/users/<int:user_id>/", AdminUserDetailView.as_view(), name="admin-user-detail"),
+    path("admin/users/<int:user_id>/activate/", AdminUserActivateView.as_view(), name="admin-user-activate"),
+    path("admin/users/<int:user_id>/deactivate/", AdminUserDeactivateView.as_view(), name="admin-user-deactivate"),
+    path("admin/users/bulk-action/", AdminUserBulkActionView.as_view(), name="admin-user-bulk-action"),
+    # Admin company list (for dropdowns)
+    path("admin/companies/", AdminCompanyListView.as_view(), name="admin-company-list"),
 ]

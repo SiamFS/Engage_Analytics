@@ -1,11 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Button, Spinner } from 'flowbite-react';
-import { Play, Pause, Volume2, VolumeX, Maximize, CameraOff } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, CameraOff } from 'lucide-react';
 import WebcamRecorder from './WebcamRecorder';
 
-const BUFFER_AHEAD = 30; 
-const BUFFER_BEHIND = 10; 
 const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded, onPlay, videoId }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -26,10 +24,7 @@ const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded,
   const isPlayingRef = useRef(false);
   const webcamPermissionRef = useRef(null);
   const faceBlockedRef = useRef(false);
-  
-  const bufferCache = useRef({});
-  const segmentsLoaded = useRef(new Set());
-  const lastBufferCheck = useRef(0);
+  const playbackStartedRef = useRef(false);
 
   useEffect(() => {
     if (!videoUrl) {
@@ -41,42 +36,9 @@ const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded,
     const videoElement = videoRef.current;
     if (!videoElement) return;
 
-    const manageBufferCache = () => {
-      const segmentsToRemove = [];
-      segmentsLoaded.current.forEach(segKey => {
-        const [, end] = segKey.split('-').map(Number);
-        if (end < currentTime - BUFFER_BEHIND) {
-          segmentsToRemove.push(segKey);
-        }
-      });
-      
-      segmentsToRemove.forEach(key => {
-        segmentsLoaded.current.delete(key);
-        delete bufferCache.current[key];
-        console.log(`Removed segment: ${key} from buffer cache`);
-      });
-    };
-
-    const handleProgress = () => {
-      if (videoElement.buffered.length > 0) {
-        for (let i = 0; i < videoElement.buffered.length; i++) {
-          const start = videoElement.buffered.start(i);
-          const end = videoElement.buffered.end(i);
-          const segKey = `${Math.floor(start)}-${Math.floor(end)}`;
-          
-          if (!segmentsLoaded.current.has(segKey)) {
-            bufferCache.current[segKey] = true;
-            segmentsLoaded.current.add(segKey);
-            console.log(`Buffered segment: ${segKey}`);
-          }
-        }
-      }
-      
-      const now = Date.now();
-      if (now - lastBufferCheck.current > 2000) {
-        lastBufferCheck.current = now;
-        manageBufferCache();
-      }
+    const handleLoadedMetadata = () => {
+      setIsLoading(false);
+      setDuration(videoElement.duration);
     };
 
     const handleCanPlay = () => {
@@ -89,8 +51,7 @@ const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded,
       }
     };
 
-    const handleError = (e) => {
-      console.error('Error loading video:', e);
+    const handleError = () => {
       setError('Failed to load video. Please try again later.');
       setIsLoading(false);
     };
@@ -103,15 +64,14 @@ const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded,
       setIsPlaying(false);
       isPlayingRef.current = false;
       if (onEnded) onEnded();
-      
-      // Handle webcam recording completion when video ends
       handleVideoComplete();
     };
 
     const handlePlay = () => {
       setIsPlaying(true);
       isPlayingRef.current = true;
-      if (!playbackStarted && onPlay) {
+      if (!playbackStartedRef.current && onPlay) {
+        playbackStartedRef.current = true;
         setPlaybackStarted(true);
         onPlay();
       }
@@ -131,6 +91,7 @@ const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded,
       setIsFullscreen(Boolean(document.fullscreenElement));
     };
 
+    videoElement.addEventListener('loadedmetadata', handleLoadedMetadata);
     videoElement.addEventListener('canplay', handleCanPlay);
     videoElement.addEventListener('error', handleError);
     videoElement.addEventListener('timeupdate', handleTimeUpdate);
@@ -138,7 +99,6 @@ const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded,
     videoElement.addEventListener('play', handlePlay);
     videoElement.addEventListener('pause', handlePause);
     videoElement.addEventListener('volumechange', handleVolumeChange);
-    videoElement.addEventListener('progress', handleProgress);
     document.addEventListener('fullscreenchange', handleFullscreenChange);
       
     const handleMouseMove = () => {
@@ -151,6 +111,7 @@ const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded,
     }
 
     return () => {
+      videoElement.removeEventListener('loadedmetadata', handleLoadedMetadata);
       videoElement.removeEventListener('canplay', handleCanPlay);
       videoElement.removeEventListener('error', handleError);
       videoElement.removeEventListener('timeupdate', handleTimeUpdate);
@@ -158,7 +119,6 @@ const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded,
       videoElement.removeEventListener('play', handlePlay);
       videoElement.removeEventListener('pause', handlePause);
       videoElement.removeEventListener('volumechange', handleVolumeChange);
-      videoElement.removeEventListener('progress', handleProgress);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       
       if (videoContainerRef.current) {
@@ -168,15 +128,9 @@ const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded,
       if (controlsTimerRef.current) {
         clearTimeout(controlsTimerRef.current);
       }
-      
-      segmentsLoaded.current.clear();
-      Object.keys(bufferCache.current).forEach(key => {
-        delete bufferCache.current[key];
-      });
     };
-  }, [videoUrl, autoPlay, onEnded, onPlay, playbackStarted]);
+  }, [videoUrl, autoPlay, onEnded, onPlay]);
 
-  // Separate effect for beforeunload (uses refs to avoid stale closure)
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (webcamPermissionRef.current === 'granted' && isPlayingRef.current) {
@@ -197,11 +151,7 @@ const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded,
     setDuration(0);
     setIsPlaying(false);
     setPlaybackStarted(false);
-    
-    segmentsLoaded.current.clear();
-    Object.keys(bufferCache.current).forEach(key => {
-      delete bufferCache.current[key];
-    });
+    playbackStartedRef.current = false;
   }, [videoUrl]);
 
   const resetControlsTimer = () => {
@@ -231,7 +181,7 @@ const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded,
 
   const toggleMute = () => {
     if (!videoRef.current) return;
-    videoRef.current.muted = !isMuted;
+    videoRef.current.muted = !videoRef.current.muted;
   };
 
   const toggleFullscreen = () => {
@@ -261,28 +211,21 @@ const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded,
     const seconds = Math.floor(timeInSeconds % 60);
     return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
   };
-  
-  // Handle webcam permission change
+
   const handleWebcamPermissionChange = (state) => {
     webcamPermissionRef.current = state;
   };
-  
-  // Handle recording error
+
   const handleRecordingError = (errorMessage) => {
     console.error('Recording error:', errorMessage);
-    // We don't need to stop video playback on recording error,
-    // just log the error and allow the video to continue playing
   };
-  
-  // Pause video instantly when face-blocked
+
   useEffect(() => {
     if (faceBlocked && isPlaying && videoRef.current) {
       videoRef.current.pause();
-      // Don't set isPlaying here — the pause event handler will do that
     }
   }, [faceBlocked, isPlaying]);
 
-  // Handle face-block change from WebcamRecorder — auto-play when unblocked
   const handleFaceBlockedChange = (blocked) => {
     const prev = faceBlockedRef.current;
     faceBlockedRef.current = blocked;
@@ -292,11 +235,9 @@ const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded,
     }
   };
 
-  // Handle video complete (end of playback or user navigating away)
   const handleVideoComplete = async () => {
     try {
       if (webcamRecorderRef.current?.stopAndUploadRecording) {
-        // This will be called from the WebcamRecorder's ref
         await webcamRecorderRef.current.stopAndUploadRecording();
       }
     } catch (error) {
@@ -304,25 +245,34 @@ const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded,
     }
   };
 
+  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+
   return (
     <div 
       ref={videoContainerRef}
-      className={`relative w-full ${isFullscreen ? 'h-full' : 'aspect-video'} bg-black ${isFullscreen ? '' : 'rounded-lg'} overflow-hidden group`}
+      className={`relative w-full ${isFullscreen ? 'h-full' : 'aspect-video'} bg-black ${isFullscreen ? '' : 'rounded-xl'} overflow-hidden group`}
       role="application"
       aria-label="Video Player"
     >
       {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-70 z-10">
-          <Spinner size="xl" color="info" />
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80 z-10">
+          <div className="flex flex-col items-center gap-3">
+            <Spinner size="xl" className="fill-blue-500" />
+            <p className="text-gray-400 text-sm">Loading video...</p>
+          </div>
         </div>
       )}
 
       {error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-70 z-10">
-          <div className="text-center p-4">
-            <p className="text-red-500 mb-2">{error}</p>
-            <Button 
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-900/90 z-10">
+          <div className="text-center p-6">
+            <div className="w-14 h-14 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
+              <span className="text-red-400 text-2xl font-bold">!</span>
+            </div>
+            <p className="text-red-400 mb-3 text-sm">{error}</p>
+            <Button
               color="blue"
+              size="sm"
               onClick={() => {
                 if (videoRef.current) {
                   setIsLoading(true);
@@ -330,7 +280,7 @@ const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded,
                   videoRef.current.load();
                 }
               }}
-              className="mt-2 flex items-center justify-center"
+              className="bg-brand-600 hover:bg-brand-700 focus:ring-0"
             >
               Try Again
             </Button>
@@ -340,7 +290,7 @@ const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded,
 
       <video
         ref={videoRef}
-        className="w-full h-full"
+        className="w-full h-full cursor-pointer"
         poster={thumbnailUrl}
         preload="metadata"
         playsInline
@@ -364,66 +314,71 @@ const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded,
         />
       )}
 
-      {/* Recording paused indicator now rendered inside WebcamRecorder */}
-
-      <button 
-        className="absolute inset-0 w-full h-full bg-transparent border-0 cursor-default focus:outline-none"
-        onClick={togglePlay}
-        aria-label={isPlaying ? "Pause video" : "Play video"}
-        type="button"
-        tabIndex="0"
-      />
-
       <div
-        className={`absolute inset-0 transition-opacity duration-300 bg-gradient-to-t from-black/70 to-transparent flex flex-col justify-end ${showControls || !isPlaying ? 'opacity-100' : 'opacity-0'}`}
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => {
-    
-          if (e.key === ' ' || e.key === 'Enter') {
-             e.stopPropagation(); 
-          }
-        }}
-        role="toolbar"
-        aria-label="Video controls"
-        tabIndex="-1" 
+        className={`absolute inset-0 transition-opacity duration-300 pointer-events-none ${
+          showControls || !isPlaying ? 'opacity-100' : 'opacity-0'
+        }`}
       >
-        <div className="mx-4 my-2 h-1 bg-gray-600 rounded-full overflow-hidden">
-          <div 
-            className="h-full bg-blue-500" 
-            style={{ width: `${(currentTime / duration) * 100}%` }} 
-            aria-label="Video progress"
-          />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
+      </div>
+
+      {/* Bottom controls panel */}
+      <div
+        className={`absolute bottom-0 left-0 right-0 transition-all duration-300 ${
+          showControls || !isPlaying ? 'translate-y-0' : 'translate-y-full'
+        }`}
+      >
+        {/* Progress bar */}
+        <div className="px-4 pt-2">
+          <div className="relative h-1.5 bg-surface-500/50 rounded-full overflow-hidden group/progress cursor-pointer"
+            onClick={(e) => {
+              if (!videoRef.current) return;
+              const rect = e.currentTarget.getBoundingClientRect();
+              const percent = (e.clientX - rect.left) / rect.width;
+              videoRef.current.currentTime = percent * duration;
+            }}
+          >
+            <div 
+              className="h-full bg-brand-500 rounded-full relative transition-all duration-100"
+              style={{ width: `${progressPercent}%` }}
+            >
+              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-md opacity-0 group-hover/progress:opacity-100 transition-opacity" />
+            </div>
+          </div>
         </div>
-        
-     
-        <div className="flex items-center justify-between p-4">
-          <div className="flex items-center space-x-4">
-   
+
+        {/* Controls row */}
+        <div className="flex items-center justify-between px-4 pb-3 pt-2">
+          <div className="flex items-center gap-3">
             <button 
-              onClick={togglePlay}
-              className={`focus:outline-none ${faceBlocked && !isPlaying ? 'text-gray-500 cursor-not-allowed' : 'text-white hover:text-blue-400'}`}
+              onClick={(e) => { e.stopPropagation(); togglePlay(); }}
+              className={`p-1.5 rounded-full transition-all duration-200 ${
+                faceBlocked && !isPlaying
+                  ? 'text-gray-500 cursor-not-allowed'
+                  : 'text-white hover:bg-white/10 hover:text-brand-400'
+              }`}
               aria-label={isPlaying ? 'Pause' : faceBlocked ? 'Face required to play' : 'Play'}
               type="button"
               disabled={faceBlocked && !isPlaying}
             >
-              {isPlaying ? <Pause size={24} /> : <Play size={24} />}
+              {isPlaying ? <Pause size={20} /> : <Play size={20} />}
             </button>
- 
-            <div className="flex items-center">
+
+            <div className="flex items-center gap-2">
               <button 
-                onClick={toggleMute}
-                className="text-white focus:outline-none hover:text-blue-400 mr-2"
+                onClick={(e) => { e.stopPropagation(); toggleMute(); }}
+                className="p-1.5 rounded-full text-white hover:bg-white/10 hover:text-blue-400 transition-all duration-200"
                 aria-label={isMuted ? "Unmute" : "Mute"}
                 type="button"
               >
-                {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
               </button>
               
               <input 
                 type="range" 
                 min="0" 
                 max="1" 
-                step="0.01" 
+                step="0.05" 
                 value={isMuted ? 0 : volume}
                 onChange={(e) => {
                   const newVolume = parseFloat(e.target.value);
@@ -434,44 +389,66 @@ const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded,
                     }
                   }
                 }}
-                className="w-16 h-1 bg-gray-500 rounded-full accent-blue-500"
+                onClick={(e) => e.stopPropagation()}
+                className="w-16 h-1.5 bg-gray-500/50 rounded-full accent-blue-500 cursor-pointer appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-md"
                 aria-label="Volume control"
+                title={`Volume: ${Math.round((isMuted ? 0 : volume) * 100)}%`}
               />
             </div>
-            
-            <div className="text-white text-sm">
+
+            <span className="text-gray-300 text-xs font-medium tabular-nums select-none">
               {formatTime(currentTime)} / {formatTime(duration)}
-            </div>
+            </span>
           </div>
           
-          <div>
+          <div className="flex items-center gap-1">
+            {faceBlocked && !isPlaying && (
+              <div className="flex items-center gap-1.5 text-yellow-400 bg-yellow-400/10 rounded-lg px-2.5 py-1 mr-2">
+                <CameraOff size={13} />
+                <span className="text-[11px] font-medium">Face camera</span>
+              </div>
+            )}
             <button 
-              onClick={toggleFullscreen}
-              className="text-white focus:outline-none hover:text-blue-400"
+              onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
+              className="p-1.5 rounded-full text-white hover:bg-white/10 hover:text-blue-400 transition-all duration-200"
               aria-label={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
               type="button"
             >
-              <Maximize size={20} />
+              {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
             </button>
           </div>
         </div>
       </div>
       
-      {!isPlaying && !isLoading && !error && !faceBlocked && (
-        <button 
-          onClick={togglePlay}
-          className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white bg-blue-600 bg-opacity-70 hover:bg-opacity-90 rounded-full p-4 transition-all duration-150"
-          aria-label="Play"
+      {/* Center play button (shown when paused) */}
+      <div
+        className={`absolute inset-0 flex items-center justify-center transition-all duration-300 ${
+          isPlaying || isLoading || error ? 'opacity-0 pointer-events-none' : 'opacity-100'
+        }`}
+        onClick={togglePlay}
+      >
+        <button
+          disabled={faceBlocked}
+          className={`relative w-16 h-16 rounded-full flex items-center justify-center transition-all duration-200 ${
+            faceBlocked
+              ? 'bg-surface-500/50 cursor-not-allowed'
+              : 'bg-brand-600/80 hover:bg-brand-600 hover:scale-105 cursor-pointer shadow-lg shadow-brand-600/20'
+          }`}
+          aria-label={faceBlocked ? 'Face required to play' : 'Play'}
           type="button"
         >
-          <Play size={32} />
+          <Play size={28} className="text-white" />
+          {!faceBlocked && (
+            <div className="absolute inset-0 rounded-full animate-ping bg-brand-400/20" />
+          )}
         </button>
-      )}
+      </div>
 
+      {/* Face-blocked full overlay message */}
       {!isPlaying && !isLoading && !error && faceBlocked && (
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center text-white bg-gray-900/80 backdrop-blur-sm rounded-lg px-6 py-4">
-          <CameraOff size={36} className="mb-2 text-yellow-400" />
-          <p className="text-sm font-medium text-center">Face the camera to continue watching</p>
+        <div className="absolute top-4 right-16 flex items-center gap-2 text-white bg-gray-900/80 backdrop-blur-sm rounded-lg px-3 py-2 shadow-lg border border-yellow-500/20">
+          <CameraOff size={16} className="text-yellow-400 shrink-0" />
+          <p className="text-xs">Face the camera to continue</p>
         </div>
       )}
     </div>

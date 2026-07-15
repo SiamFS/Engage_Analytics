@@ -12,6 +12,8 @@ from api.models import (
     VideoLike,
     VideoShare,
     WebcamRecording,
+    SurveyQuestion,
+    FeedbackResponse,
 )
 from api.services.video_view_service import VideoViewService
 
@@ -234,3 +236,18 @@ class ViewerProfileAdmin(admin.ModelAdmin):
 
 # Register CompanyProfile directly as there's no custom admin class for it
 admin.site.register(CompanyProfile)
+
+@admin.register(SurveyQuestion)
+class SurveyQuestionAdmin(admin.ModelAdmin):
+    list_display = ("question_text", "question_type", "order", "is_required", "is_active", "section")
+    list_filter = ("question_type", "is_required", "is_active", "section")
+    search_fields = ("question_text",)
+    list_editable = ("order", "is_required", "is_active")
+    ordering = ("order", "id")
+
+@admin.register(FeedbackResponse)
+class FeedbackResponseAdmin(admin.ModelAdmin):
+    list_display = ("user", "video", "rating", "submitted_at")
+    list_filter = ("rating", "submitted_at")
+    search_fields = ("user__email",)
+    readonly_fields = ("submitted_at", "completed_at")

@@ -29,7 +29,7 @@ const UserPointsCard = ({ compact = false }) => {
 
   if (loading) {
     return (
-      <Card className="bg-gray-800 border-gray-700">
+      <Card className="bg-elevated border-elevated-border">
         <div className="flex justify-center items-center py-4">
           <Spinner size="md" />
         </div>
@@ -39,7 +39,7 @@ const UserPointsCard = ({ compact = false }) => {
 
   if (error) {
     return (
-      <Card className="bg-gray-800 border-gray-700">
+      <Card className="bg-elevated border-elevated-border">
         <Alert color="failure">
           {error}
         </Alert>
@@ -49,7 +49,7 @@ const UserPointsCard = ({ compact = false }) => {
 
   if (!pointsData) {
     return (
-      <Card className="bg-gray-800 border-gray-700">
+      <Card className="bg-elevated border-elevated-border">
         <p className="text-gray-400 text-center py-4">No points data available</p>
       </Card>
     );
@@ -58,7 +58,7 @@ const UserPointsCard = ({ compact = false }) => {
   
 
   return (
-    <Card className="bg-gray-800 border-gray-700">
+    <Card className="bg-elevated border-elevated-border">
       <div className="flex justify-between items-center">
         <h3 className="text-xl font-bold text-white flex items-center">
           <Award className="mr-2 text-yellow-400" size={24} />
@@ -70,7 +70,7 @@ const UserPointsCard = ({ compact = false }) => {
       </div>
       
       <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className={`bg-gray-700/50 p-3 md:p-4 rounded-lg ${compact ? 'text-sm' : ''}`}>
+        <div className={`bg-surface-600 p-3 md:p-4 rounded-lg ${compact ? 'text-sm' : ''}`}>
           <p className="text-xs md:text-sm text-gray-400">Total Points Earned</p>
           <p className="text-xl md:text-2xl font-bold text-white">{pointsData.points_earned} Points</p>
         </div>
@@ -88,10 +88,10 @@ const UserPointsCard = ({ compact = false }) => {
       
       <div className="mt-4 md:mt-6">
         <h4 className={`text-base md:text-lg font-medium text-white flex items-center mb-2 md:mb-4 ${compact ? 'text-sm' : ''}`}>
-          <History className="mr-2 text-blue-400" size={compact ? 16 : 18} />
+          <History className="mr-2 text-brand-400" size={compact ? 16 : 18} />
           Points Activity
         </h4>
-        <div className="bg-gray-700/50 rounded-lg p-3 md:p-4 text-center">
+        <div className="bg-surface-600 rounded-lg p-3 md:p-4 text-center">
           <p className="text-xs md:text-sm text-gray-400">
             Complete video evaluations to earn more points! Each evaluation is worth 10 points.
           </p>

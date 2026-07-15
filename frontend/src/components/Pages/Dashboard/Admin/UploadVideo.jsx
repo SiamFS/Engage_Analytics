@@ -1,15 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Card,
   Button,
   Label,
   TextInput,
   Textarea,
   Select,
-  FileInput,
-  Spinner,
-  Progress,
-  Alert
+  Spinner
 } from 'flowbite-react';
 import {
   Upload as UploadIcon,
@@ -18,7 +14,9 @@ import {
   Check,
   ArrowRight,
   AlertCircle,
-  ArrowLeft
+  ArrowLeft,
+  Star,
+  X
 } from 'lucide-react';
 import VideoService from '../../../../utils/VideoService';
 
@@ -50,6 +48,10 @@ const UploadVideo = () => {
   const [thumbDimensions, setThumbDimensions] = useState({ width: 0, height: 0 });
   const [isAutoCropping, setIsAutoCropping] = useState(false);
   const [uploadStage, setUploadStage] = useState('preparing');
+  const [rewardInfo, setRewardInfo] = useState(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const videoInputRef = useRef(null);
+  const thumbInputRef = useRef(null);
 
   const categories = [
     { value: 'educational', label: 'Educational' },
@@ -71,12 +73,8 @@ const UploadVideo = () => {
     const currentThumbnailUrl = thumbnailPreviewUrl;
 
     return () => {
-      if (currentVideoUrl) {
-        URL.revokeObjectURL(currentVideoUrl);
-      }
-      if (currentThumbnailUrl) {
-        URL.revokeObjectURL(currentThumbnailUrl);
-      }
+      if (currentVideoUrl) URL.revokeObjectURL(currentVideoUrl);
+      if (currentThumbnailUrl) URL.revokeObjectURL(currentThumbnailUrl);
     };
   }, [videoPreviewUrl, thumbnailPreviewUrl]);
 
@@ -87,18 +85,12 @@ const UploadVideo = () => {
       return;
     }
     
-    const processedFile = new File(
-      [blob], 
-      `processed_${file.name.split('.')[0]}.jpg`, 
-      { type: 'image/jpeg' }
-    );
-    
+    const processedFile = new File([blob], `processed_${file.name.split('.')[0]}.jpg`, { type: 'image/jpeg' });
     setProcessedThumbnailFile(processedFile);
     setIsAutoCropping(false);
     resolve(processedFile);
   };
 
-  // Image onload handler to avoid excessive nesting
   const handleImageLoad = (img, file, resolve, reject) => {
     const canvas = thumbnailCanvasRef.current;
     if (!canvas) {
@@ -133,11 +125,7 @@ const UploadVideo = () => {
     ctx.fillRect(0, 0, TARGET_WIDTH, TARGET_HEIGHT);
     ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
     
-    canvas.toBlob(
-      (blob) => handleCanvasBlob(blob, file, resolve, reject), 
-      'image/jpeg', 
-      0.9
-    );
+    canvas.toBlob((blob) => handleCanvasBlob(blob, file, resolve, reject), 'image/jpeg', 0.9);
   };
 
   const processThumbnail = (file) => {
@@ -145,35 +133,23 @@ const UploadVideo = () => {
       setIsAutoCropping(true);
       const img = new Image();
       img.onload = () => handleImageLoad(img, file, resolve, reject);
-      
       img.onerror = () => {
         setIsAutoCropping(false);
         reject(new Error("Failed to load thumbnail image"));
       };
-      
       img.src = URL.createObjectURL(file);
     });
   };
 
   const handleInputChange = (e) => {
     const { id, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [id]: value
-    }));
+    setFormData(prev => ({ ...prev, [id]: value }));
   };
 
   const generateAndSetFilename = () => {
-    if (!formData.title) {
-      return '';
-    }
+    if (!formData.title) return '';
     const timestamp = Date.now();
-    const safeName = formData.title
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/gi, '_')
-      .replace(/_+/g, '_')
-      .substring(0, 50);
+    const safeName = formData.title.trim().toLowerCase().replace(/[^a-z0-9]+/gi, '_').replace(/_+/g, '_').substring(0, 50);
     const randomBytes = new Uint8Array(5); 
     window.crypto.getRandomValues(randomBytes);
     const randomString = Array.from(randomBytes).map(byte => byte.toString(16).padStart(2, '0')).join('');
@@ -183,9 +159,7 @@ const UploadVideo = () => {
   };
 
   const validateMetadataForm = () => {
-    if (!formData.title.trim()) {
-      return { valid: false, message: 'Video title is required.' };
-    }
+    if (!formData.title.trim()) return { valid: false, message: 'Video title is required.' };
     return { valid: true, message: '' };
   };
 
@@ -221,6 +195,12 @@ const UploadVideo = () => {
         videoUrl: response.video_upload_url,
         thumbnailUrl: response.thumbnail_upload_url
       });
+      if (response.points_awarded) {
+        setRewardInfo({
+          points_awarded: response.points_awarded,
+          total_points: response.total_points,
+        });
+      }
       setCurrentStep(2);
       setUploadStatus(null);
       setStatusMessage('');
@@ -248,7 +228,7 @@ const UploadVideo = () => {
       return;
     }
     
-    if (!file.type.startsWith('video/') || file.size > 500 * 1024 * 1024) { // Limit size to 500MB
+    if (!file.type.startsWith('video/') || file.size > 500 * 1024 * 1024) {
       setStatusMessage('Invalid file type or size. Please select a valid video file under 500MB.');
       setUploadStatus('error');
       e.target.value = '';
@@ -263,7 +243,7 @@ const UploadVideo = () => {
     try {
       const newPreviewUrl = URL.createObjectURL(file);
       if (validateUrl(newPreviewUrl)) {
-        const sanitizedUrl = newPreviewUrl.replace(/[^a-zA-Z0-9-_.:\/]/g, ''); // Basic sanitization
+        const sanitizedUrl = newPreviewUrl.replace(/[^a-zA-Z0-9-_.:\/]/g, '');
         setVideoPreviewUrl(sanitizedUrl);
       } else {
         throw new Error('Invalid URL format');
@@ -277,19 +257,15 @@ const UploadVideo = () => {
     generateThumbnailFromVideo(file);
   };
 
-  // Handler for canvas.toBlob in video thumbnail generation to avoid deep nesting
   const handleVideoThumbnailBlob = (blob) => {
     if (blob) {
       const thumbnailFile = new File([blob], `thumbnail_${Date.now()}.jpg`, { type: 'image/jpeg' });
-      
       setStatusMessage('Auto-generated thumbnail from video. You can replace it if needed.');
       setTimeout(() => setStatusMessage(''), 5000);
-      
       handleThumbnailChangeWithFile(thumbnailFile);
     }
   };
 
-  // Handle video seeking for thumbnail generation
   const handleVideoSeeked = (video) => {
     const canvas = document.createElement('canvas');
     canvas.width = video.videoWidth;
@@ -320,15 +296,8 @@ const UploadVideo = () => {
       if (validateUrl(videoUrl)) {
         video.src = videoUrl;
         
-        
-        video.addEventListener('loadeddata', () => {
-          URL.revokeObjectURL(videoUrl);
-        }, { once: true });
-        
-            video.addEventListener('error', () => {
-          URL.revokeObjectURL(videoUrl);
-          console.error('Error loading video for thumbnail generation');
-        }, { once: true });
+        video.addEventListener('loadeddata', () => { URL.revokeObjectURL(videoUrl); }, { once: true });
+        video.addEventListener('error', () => { URL.revokeObjectURL(videoUrl); }, { once: true });
       } else {
         throw new Error('Invalid URL format');
       }
@@ -345,7 +314,6 @@ const UploadVideo = () => {
       setThumbnailFile(null);
       return;
     }
-    
     handleThumbnailChangeWithFile(file);
   };
 
@@ -380,10 +348,7 @@ const UploadVideo = () => {
       
       const img = new Image();
       img.onload = () => {
-        setThumbDimensions({
-          width: img.width,
-          height: img.height
-        });
+        setThumbDimensions({ width: img.width, height: img.height });
       };
       img.src = newPreviewUrl;
       
@@ -395,26 +360,15 @@ const UploadVideo = () => {
   };
 
   const validateFileForm = () => {
-    if (!videoFile) {
-      return { valid: false, message: 'Please select a video file to upload.' };
-    }
-    if (!processedThumbnailFile && !thumbnailFile) {
-      return { valid: false, message: 'Please select a thumbnail image.' };
-    }
-    if (!uploadUrls.videoUrl || !uploadUrls.thumbnailUrl) {
-      return { valid: false, message: 'Upload authorization is missing. Please go back to details.' };
-    }
+    if (!videoFile) return { valid: false, message: 'Please select a video file to upload.' };
+    if (!processedThumbnailFile && !thumbnailFile) return { valid: false, message: 'Please select a thumbnail image.' };
+    if (!uploadUrls.videoUrl || !uploadUrls.thumbnailUrl) return { valid: false, message: 'Upload authorization is missing. Please go back to details.' };
     return { valid: true, message: '' };
   };
 
-  // Update updateProgressWithDelay function to not focus on percentages
   const updateProgressWithDelay = (value, message = null) => {
-    // Still track progress internally for the progress bar
     setUploadProgress(prevProgress => Math.max(prevProgress, value));
-    
-    if (message) {
-      setStatusMessage(message);
-    }
+    if (message) setStatusMessage(message);
   };
 
   const handleFileUpload = async (e) => {
@@ -426,55 +380,39 @@ const UploadVideo = () => {
       return;
     }
 
-    // Reset progress tracking
     setUploadStatus('uploading');
     setUploadProgress(0);
     setUploadStage('preparing');
     setStatusMessage('Preparing upload...');
 
-    if (videoPreviewUrl) {
-      URL.revokeObjectURL(videoPreviewUrl);
-      setVideoPreviewUrl(null);
-    }
-    if (thumbnailPreviewUrl) {
-      URL.revokeObjectURL(thumbnailPreviewUrl);
-      setThumbnailPreviewUrl(null);
-    }
+    if (videoPreviewUrl) { URL.revokeObjectURL(videoPreviewUrl); setVideoPreviewUrl(null); }
+    if (thumbnailPreviewUrl) { URL.revokeObjectURL(thumbnailPreviewUrl); setThumbnailPreviewUrl(null); }
 
     try {
-      // Upload video first (70% of total progress)
       setUploadStage('video');
       setStatusMessage(`Uploading video: ${videoFile.name}...`);
       updateProgressWithDelay(1, 'Uploading video...');
       
       await VideoService.uploadFileToBlob(uploadUrls.videoUrl, videoFile, (progress) => {
-        const actualProgress = Math.min(Math.floor(progress * 70), 70);
-        updateProgressWithDelay(actualProgress, `Uploading video...`);
+        updateProgressWithDelay(Math.min(Math.floor(progress * 70), 70), `Uploading video...`);
       });
 
-      // Ensure we reach exactly 70% when video upload is complete
       updateProgressWithDelay(70, 'Video upload complete. Preparing thumbnail...');
       
-      // Upload thumbnail next (remaining 30% of progress)
       setUploadStage('thumbnail');
       const thumbnailToUpload = processedThumbnailFile || thumbnailFile;
       setStatusMessage(`Uploading thumbnail: ${thumbnailToUpload.name}...`);
       
       await VideoService.uploadFileToBlob(uploadUrls.thumbnailUrl, thumbnailToUpload, (progress) => {
-        const actualProgress = 70 + Math.min(Math.floor(progress * 30), 30);
-        updateProgressWithDelay(actualProgress, `Uploading thumbnail...`);
+        updateProgressWithDelay(70 + Math.min(Math.floor(progress * 30), 30), `Uploading thumbnail...`);
       });
 
-      // Ensure we reach exactly 100% when all uploads complete
       setUploadProgress(100);
       setUploadStage('complete');
       setUploadStatus('success');
       setStatusMessage('Video and thumbnail uploaded successfully!');
       
-      // Short delay before moving to success step
-      setTimeout(() => {
-        setCurrentStep(3);
-      }, 500);
+      setTimeout(() => { setCurrentStep(3); }, 500);
     } catch (error) {
       console.error('File upload failed:', error);
       setUploadStatus('error');
@@ -483,14 +421,7 @@ const UploadVideo = () => {
   };
 
   const handleReset = () => {
-    setFormData({ 
-      title: '', 
-      description: '', 
-      category: '', 
-      visibility: 'private',
-      view_limit: '',
-      auto_private_after: ''
-    });
+    setFormData({ title: '', description: '', category: '', visibility: 'private', view_limit: '', auto_private_after: '' });
     setVideoFile(null);
     setThumbnailFile(null);
     setProcessedThumbnailFile(null);
@@ -500,21 +431,50 @@ const UploadVideo = () => {
     setStatusMessage('');
     setUploadProgress(0);
     setUploadStage('preparing');
+    setRewardInfo(null);
     setCurrentStep(1);
 
-    if (videoPreviewUrl) {
-        URL.revokeObjectURL(videoPreviewUrl);
-    }
-    if (thumbnailPreviewUrl) {
-        URL.revokeObjectURL(thumbnailPreviewUrl);
-    }
+    if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
+    if (thumbnailPreviewUrl) URL.revokeObjectURL(thumbnailPreviewUrl);
     setVideoPreviewUrl(null);
     setThumbnailPreviewUrl(null);
+  };
 
-    const videoInput = document.getElementById('video');
-    const thumbInput = document.getElementById('thumbnail');
-    if (videoInput) videoInput.value = '';
-    if (thumbInput) thumbInput.value = '';
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      const file = files[0];
+      if (file.type.startsWith('video/') && file.size <= 500 * 1024 * 1024) {
+        if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
+        setVideoFile(file);
+        setUploadStatus(null);
+        setStatusMessage('');
+        const newPreviewUrl = URL.createObjectURL(file);
+        if (validateUrl(newPreviewUrl)) {
+          const sanitizedUrl = newPreviewUrl.replace(/[^a-zA-Z0-9-_.:\/]/g, '');
+          setVideoPreviewUrl(sanitizedUrl);
+        }
+        generateThumbnailFromVideo(file);
+      } else {
+        setStatusMessage(file.type.startsWith('video/') ? 'File exceeds 500MB limit.' : 'Please select a valid video file.');
+        setUploadStatus('error');
+      }
+    }
   };
 
   const renderMetadataForm = () => (
@@ -534,9 +494,9 @@ const UploadVideo = () => {
         />
       </div>
       <div>
-         <div className="mb-2 block">
-            <Label htmlFor="description" value="Description" className="text-white" />
-         </div>
+        <div className="mb-2 block">
+          <Label htmlFor="description" value="Description" className="text-white" />
+        </div>
         <Textarea
           id="description"
           value={formData.description}
@@ -547,33 +507,28 @@ const UploadVideo = () => {
         />
       </div>
       <div>
-         <div className="mb-2 block">
-           <Label htmlFor="category" value="Category" className="text-white" />
-         </div>
+        <div className="mb-2 block">
+          <Label htmlFor="category" value="Category" className="text-white" />
+        </div>
         <Select id="category" value={formData.category} onChange={handleInputChange}>
           <option value="">Select a category (optional)</option>
           {categories.map(category => (
-            <option key={category.value} value={category.value}>
-              {category.label}
-            </option>
+            <option key={category.value} value={category.value}>{category.label}</option>
           ))}
         </Select>
       </div>
       <div>
         <div className="mb-2 block">
-            <Label htmlFor="visibility" value="Visibility" className="text-white" />
+          <Label htmlFor="visibility" value="Visibility" className="text-white" />
         </div>
         <Select id="visibility" value={formData.visibility} onChange={handleInputChange}>
           <option value="private">Private (Only you can see)</option>
           <option value="unlisted">Unlisted (Anyone with the link)</option>
           <option value="public">Public (Visible to everyone)</option>
         </Select>
-         <p className="mt-1 text-xs text-gray-300">
-              Choose who can view your video.
-         </p>
+        <p className="mt-1 text-xs text-gray-300">Choose who can view your video.</p>
       </div>
       
-      {/* Add view limit options */}
       <div>
         <div className="mb-2 block">
           <Label htmlFor="view_limit" value="View Limit (optional)" className="text-white" />
@@ -586,33 +541,16 @@ const UploadVideo = () => {
           onChange={handleInputChange}
           placeholder="Maximum number of views before video becomes private"
         />
-        <p className="mt-1 text-xs text-gray-300">
-          Set a maximum number of views. After reaching this limit, the video will become private.
-        </p>
+        <p className="mt-1 text-xs text-gray-300">Set a maximum number of views. After reaching this limit, the video will become private.</p>
       </div>
-
-           
-      <div className="flex justify-end space-x-3 pt-5 border-t border-gray-600 mt-5">
-        <Button
-          type="button"
-          onClick={handleReset}
-          color="gray"
-          outline
-          disabled={uploadStatus === 'pending'}
-        >
+      
+      <div className="flex justify-end space-x-3 pt-5 border-t border-elevated-border mt-5">
+        <Button type="button" onClick={handleReset} disabled={uploadStatus === 'pending'} className="border border-elevated-border bg-surface-600 text-gray-300 hover:bg-surface-500 focus:ring-0">
           Clear Form
         </Button>
-        <Button
-          type="submit"
-          disabled={uploadStatus === 'pending' || !formData.title.trim()}
-          color="blue"
-          isProcessing={uploadStatus === 'pending'}
-          processingSpinner={<Spinner size="sm" />}
-        >
+        <Button type="submit" disabled={uploadStatus === 'pending' || !formData.title.trim()} className="bg-brand-600 hover:bg-brand-700 text-white disabled:opacity-50 focus:ring-0" isProcessing={uploadStatus === 'pending'} processingSpinner={<Spinner size="sm" />}>
           {uploadStatus === 'pending' ? 'Initializing...' : (
-            <>
-              Continue to Upload <ArrowRight className="ml-2 h-5 w-5" />
-            </>
+            <>Continue to Upload <ArrowRight className="ml-2 h-5 w-5" /></>
           )}
         </Button>
       </div>
@@ -623,9 +561,7 @@ const UploadVideo = () => {
     <form onSubmit={handleFileUpload} className="space-y-6">
       <div className="text-center mb-6"> 
         <h3 className="text-xl font-semibold text-white">Upload Files</h3>
-        <p className="text-gray-300 mt-1">
-          Select the video file and a thumbnail image.
-        </p>
+        <p className="text-gray-300 mt-1">Select the video file and a thumbnail image.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
@@ -634,43 +570,43 @@ const UploadVideo = () => {
             <div className="mb-2 block">
               <Label htmlFor="video" value="Video File (required)" className="text-white" />
             </div>
-            <FileInput
-              id="video"
-              onChange={handleVideoChange}
-              accept="video/*"
-              helperText="Select the main video file (e.g., MP4, MOV, AVI)."
-              required
-            />
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`relative border-2 border-dashed rounded-xl p-6 text-center transition-all duration-200 cursor-pointer ${
+                isDragOver
+                  ? 'border-brand-400 bg-brand-600/10'
+                  : 'border-elevated-border bg-surface-600 hover:border-brand-500/50 hover:bg-surface-500/50'
+              }`}
+              onClick={() => videoInputRef.current?.click()}
+            >
+              <input ref={videoInputRef} type="file" id="video" onChange={handleVideoChange} accept="video/*" className="hidden" />
+              <Video className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+              <p className="text-sm text-gray-300">Drag & drop video or click to browse</p>
+              <p className="text-xs text-gray-500 mt-1">MP4, MOV, AVI (max 500MB)</p>
+            </div>
             {videoFile && (
               <p className="mt-2 text-xs text-green-400 flex items-center">
                 <Check size={14} className="mr-1 flex-shrink-0"/>
-                <span className="truncate">
-                  Selected: {videoFile.name} ({(videoFile.size / (1024*1024)).toFixed(2)} MB)
-                </span>
+                <span className="truncate">Selected: {videoFile.name} ({(videoFile.size / (1024*1024)).toFixed(2)} MB)</span>
               </p>
             )}
           </div>
 
           <div className="flex-grow flex flex-col min-h-[150px]">
             {videoPreviewUrl && validateUrl(videoPreviewUrl) ? (
-              <div className="p-3 border border-gray-600 rounded-lg bg-gray-700/50 flex flex-col h-full"> 
+              <div className="p-3 border border-elevated-border rounded-lg bg-surface-600 flex flex-col h-full"> 
                 <Label value="Video Preview" className="text-sm font-medium text-gray-300 mb-2 block flex-shrink-0"/>
                 <div className="relative w-full aspect-video bg-black rounded overflow-hidden flex-grow">
-                  <video
-                    src={videoPreviewUrl || ''}
-                    controls
-                    preload="metadata"
-                    className="absolute top-0 left-0 w-full h-full object-contain" 
-                    aria-label="Video Preview"
-                  >
+                  <video src={videoPreviewUrl || ''} controls preload="metadata" className="absolute top-0 left-0 w-full h-full object-contain" aria-label="Video Preview">
                     Your browser does not support the video tag.
                   </video>
-                 </div>
+                </div>
               </div>
             ) : (
-              <div className="p-3 border border-dashed border-gray-600 rounded-lg bg-gray-700/30 flex items-center justify-center text-gray-300 h-full">
-                 <Video className="w-10 h-10" /> 
-                 <span className="ml-2">Video preview appears here</span>
+              <div className="p-3 border border-dashed border-elevated-border rounded-lg bg-surface-600 flex items-center justify-center text-gray-300 h-full">
+                <Video className="w-10 h-10" /> <span className="ml-2">Video preview appears here</span>
               </div>
             )}
           </div>
@@ -681,20 +617,41 @@ const UploadVideo = () => {
             <div className="mb-2 block">
               <Label htmlFor="thumbnail" value="Thumbnail Image (required)" className="text-white" />
             </div>
-            <FileInput
-              id="thumbnail"
-              onChange={handleThumbnailChange}
-              accept="image/jpeg, image/png, image/webp, image/gif"
-              helperText="Upload a preview image. Will be auto-resized to 1280×720 (16:9)."
-              required={!thumbnailFile && !processedThumbnailFile}
-            />
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDragOver(false);
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                  const file = files[0];
+                  if (file.type.startsWith('image/')) {
+                    handleThumbnailChangeWithFile(file);
+                  } else {
+                    setStatusMessage('Please select an image file for thumbnail.');
+                    setUploadStatus('error');
+                  }
+                }
+              }}
+              className={`relative border-2 border-dashed rounded-xl p-6 text-center transition-all duration-200 cursor-pointer ${
+                isDragOver
+                  ? 'border-brand-400 bg-brand-600/10'
+                  : 'border-elevated-border bg-surface-600 hover:border-brand-500/50 hover:bg-surface-500/50'
+              }`}
+              onClick={() => thumbInputRef.current?.click()}
+            >
+              <input ref={thumbInputRef} type="file" id="thumbnail" onChange={handleThumbnailChange} accept="image/jpeg, image/png, image/webp, image/gif" className="hidden" />
+              <ImagePlus className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+              <p className="text-sm text-gray-300">Drag & drop thumbnail or click to browse</p>
+              <p className="text-xs text-gray-500 mt-1">JPG, PNG, WEBP (auto-resized to 1280x720)</p>
+            </div>
             {thumbnailFile && (
               <div className="mt-2 flex items-center justify-between">
                 <p className="text-xs text-green-400 flex items-center">
                   <Check size={14} className="mr-1 flex-shrink-0"/> 
-                  <span className="truncate"> 
-                    {isAutoCropping ? "Processing..." : `Selected: ${thumbnailFile.name} (${(thumbnailFile.size / 1024).toFixed(1)} KB)`}
-                  </span>
+                  <span className="truncate">{isAutoCropping ? "Processing..." : `Selected: ${thumbnailFile.name} (${(thumbnailFile.size / 1024).toFixed(1)} KB)`}</span>
                 </p>
                 {isAutoCropping && <Spinner size="sm" />}
               </div>
@@ -702,58 +659,30 @@ const UploadVideo = () => {
           </div>
           <div className="flex-grow flex flex-col min-h-[150px]">
             {thumbnailPreviewUrl ? (
-              <div className="p-3 border border-gray-600 rounded-lg bg-gray-700/50 flex flex-col h-full">
+              <div className="p-3 border border-elevated-border rounded-lg bg-surface-600 flex flex-col h-full">
                 <div className="flex justify-between items-center mb-2">
                   <Label value="Thumbnail Preview (16:9)" className="text-sm font-medium text-gray-300 flex-shrink-0"/>
-                  <div className="text-xs text-gray-300">
-                    {thumbDimensions.width}×{thumbDimensions.height} px
-                  </div>
+                  <div className="text-xs text-gray-300">{thumbDimensions.width}x{thumbDimensions.height} px</div>
                 </div>
                 <div className="relative w-full aspect-video bg-black rounded overflow-hidden flex-grow"> 
-                  <img
-                    src={thumbnailPreviewUrl}
-                    alt="Thumbnail Preview"
-                    className="absolute top-0 left-0 w-full h-full object-contain"
-                  />
+                  <img src={thumbnailPreviewUrl} alt="Thumbnail Preview" className="absolute top-0 left-0 w-full h-full object-contain" />
                 </div>
               </div>
             ) : (
-              <div className="p-3 border border-dashed border-gray-600 rounded-lg bg-gray-700/30 flex items-center justify-center text-gray-300 h-full">
-                <ImagePlus className="w-10 h-10" />
-                <span className="ml-2">Thumbnail preview appears here</span>
+              <div className="p-3 border border-dashed border-elevated-border rounded-lg bg-surface-600 flex items-center justify-center text-gray-300 h-full">
+                <ImagePlus className="w-10 h-10" /> <span className="ml-2">Thumbnail preview appears here</span>
               </div>
             )}
           </div>
         </div>
       </div> 
 
-      <div className="flex justify-between items-center pt-5 border-t border-gray-600 mt-8">
-        <Button
-          type="button"
-          onClick={() => {
-            setCurrentStep(1);
-            setUploadStatus(null);
-            setStatusMessage('');
-          }}
-          color="gray"
-          outline
-          disabled={uploadStatus === 'uploading'}
-        >
-          <ArrowLeft className="mr-2 h-5 w-5" />
-          Back to Details
+      <div className="flex justify-between items-center pt-5 border-t border-elevated-border mt-8">
+        <Button type="button" onClick={() => { setCurrentStep(1); setUploadStatus(null); setStatusMessage(''); }} disabled={uploadStatus === 'uploading'} className="border border-elevated-border bg-surface-600 text-gray-300 hover:bg-surface-500 focus:ring-0">
+          <ArrowLeft className="mr-2 h-5 w-5" /> Back to Details
         </Button>
-        <Button
-          type="submit"
-          disabled={!videoFile || (!thumbnailFile && !processedThumbnailFile) || !uploadUrls.videoUrl || !uploadUrls.thumbnailUrl || uploadStatus === 'uploading' || isAutoCropping}
-          color="blue"
-          isProcessing={uploadStatus === 'uploading' || isAutoCropping}
-          processingSpinner={<Spinner size="sm" />}
-        >
-          {uploadStatus === 'uploading' ? 'Uploading...' : (
-            <>
-              <UploadIcon className="mr-2 h-5 w-5" /> Start Upload
-            </>
-          )}
+        <Button type="submit" disabled={!videoFile || (!thumbnailFile && !processedThumbnailFile) || !uploadUrls.videoUrl || !uploadUrls.thumbnailUrl || uploadStatus === 'uploading' || isAutoCropping} className="bg-brand-600 hover:bg-brand-700 text-white disabled:opacity-50 focus:ring-0" isProcessing={uploadStatus === 'uploading' || isAutoCropping} processingSpinner={<Spinner size="sm" />}>
+          {uploadStatus === 'uploading' ? 'Uploading...' : (<><UploadIcon className="mr-2 h-5 w-5" /> Start Upload</>)}
         </Button>
       </div>
     </form>
@@ -762,27 +691,20 @@ const UploadVideo = () => {
   const renderUploadProgress = () => (
     <div className="py-6">
       <div className="text-center mb-6">
-        <h3 className="text-xl font-semibold text-white mb-2">
-          Uploading Your Files
-        </h3>
-        <p className="text-gray-300">
-           Please keep this window open until the upload completes.
-        </p>
+        <h3 className="text-xl font-semibold text-white mb-2">Uploading Your Files</h3>
+        <p className="text-gray-300">Please keep this window open until the upload completes.</p>
       </div>
       <div className="max-w-lg mx-auto space-y-4">
-         <div>
-            <div className="mb-1 text-gray-300">
-              <span>
-                {(() => {
-                  if (uploadStage === 'preparing') return 'Preparing upload...';
-                  if (uploadStage === 'video') return 'Uploading video...';
-                  if (uploadStage === 'thumbnail') return 'Uploading thumbnail...';
-                  return 'Processing...';
-                })()}
-              </span>
-            </div>
-            <Progress progress={uploadProgress} size="lg" color="blue" />
-         </div>
+        <div>
+          <div className="mb-1 text-gray-300">
+            <span>
+              {uploadStage === 'preparing' ? 'Preparing upload...' : uploadStage === 'video' ? 'Uploading video...' : uploadStage === 'thumbnail' ? 'Uploading thumbnail...' : 'Processing...'}
+            </span>
+          </div>
+          <div className="w-full bg-elevated rounded-full h-3 overflow-hidden">
+            <div className="bg-gradient-to-r from-brand-600 to-brand-400 h-full rounded-full transition-all duration-500" style={{ width: `${uploadProgress}%` }} />
+          </div>
+        </div>
         <div className="flex items-center justify-center text-gray-300 mt-4">
           <Spinner size="sm" className="mr-2" aria-label="Uploading" />
           <span>{statusMessage || 'Processing...'}</span>
@@ -796,52 +718,44 @@ const UploadVideo = () => {
       <div className="w-16 h-16 rounded-full bg-green-500 text-white mx-auto flex items-center justify-center mb-5 ring-4 ring-green-500/30">
         <Check size={32} strokeWidth={3} />
       </div>
-      <h3 className="text-xl font-bold text-white mb-2">
-        Upload Complete!
-      </h3>
-      <p className="text-gray-300 max-w-md mx-auto mb-8">
-        Your video <span className="font-medium text-white">"{formData.title}"</span> has been successfully uploaded. It may take a few moments to process before it's available.
+      <h3 className="text-xl font-bold text-white mb-2">Upload Complete!</h3>
+      <p className="text-gray-300 max-w-md mx-auto mb-4">
+        Your video <span className="font-medium text-white">&quot;{formData.title}&quot;</span> has been successfully uploaded. It may take a few moments to process before it&apos;s available.
       </p>
+      {rewardInfo && (
+        <div className="inline-flex items-center gap-2 bg-gradient-to-r from-yellow-500/10 to-yellow-600/5 border border-yellow-500/20 rounded-xl px-5 py-3 mb-6">
+          <Star size={18} className="text-yellow-400 fill-yellow-400" />
+          <span className="text-yellow-200 text-sm font-medium">
+            You earned <span className="text-yellow-400 font-bold">{rewardInfo.points_awarded} points</span> for this upload! Total: <span className="text-white font-bold">{rewardInfo.total_points}</span> points
+          </span>
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
-        <Button onClick={handleReset} color="gray" outline>
-          Upload Another Video
-        </Button>
-        <Button href="/dashboard" color="blue">
-          View My Dashboard
-        </Button>
+        <Button onClick={handleReset} className="border border-elevated-border bg-surface-600 text-gray-300 hover:bg-surface-500 focus:ring-0">Upload Another Video</Button>
+        <Button href="/dashboard" className="bg-brand-600 hover:bg-brand-700 text-white focus:ring-0">View My Dashboard</Button>
       </div>
     </div>
   );
 
   const renderAlert = () => {
-    if (!statusMessage || (uploadStatus !== 'error' && uploadStatus !== 'info')) {
-      return null;
-    }
+    if (!statusMessage || (uploadStatus !== 'error' && uploadStatus !== 'info')) return null;
     return (
-      <Alert
-        color={uploadStatus === 'error' ? 'failure' : 'info'}
-        icon={uploadStatus === 'error' ? AlertCircle : undefined}
-        onDismiss={() => {
-          setUploadStatus(null);
-          setStatusMessage('');
-        }}
-        className="mb-6"
-        rounded
-      >
-        <p className="font-medium text-sm">{statusMessage}</p>
-      </Alert>
+      <div className={`mb-6 p-4 rounded-xl flex items-start gap-3 ${uploadStatus === 'error' ? 'bg-red-900/20 border border-red-800/40' : 'bg-brand-600/10 border border-brand-500/20'}`}>
+        {uploadStatus === 'error' && <AlertCircle size={18} className="text-red-400 shrink-0 mt-0.5" />}
+        <div className="flex-1">
+          <p className={`font-medium text-sm ${uploadStatus === 'error' ? 'text-red-300' : 'text-brand-300'}`}>{statusMessage}</p>
+        </div>
+        <button onClick={() => { setUploadStatus(null); setStatusMessage(''); }} className="text-gray-500 hover:text-white shrink-0" type="button">
+          <X size={16} />
+        </button>
+      </div>
     );
   };
 
-  // Helper function to get step icon background class
   const getStepIconClass = (stepNumber) => {
-    if (currentStep === stepNumber) {
-      return 'border-blue-500 bg-blue-900';
-    } 
-    if (currentStep > stepNumber) {
-      return 'border-green-500 bg-green-900';
-    }
-    return 'border-gray-600 bg-gray-700';
+    if (currentStep === stepNumber) return 'border-brand-500 bg-brand-900';
+    if (currentStep > stepNumber) return 'border-green-500 bg-green-900';
+    return 'border-elevated-border bg-surface-600';
   };
 
   const renderSteps = () => {
@@ -855,25 +769,15 @@ const UploadVideo = () => {
       <ol className="flex items-center w-full text-sm font-medium text-center text-gray-400 sm:text-base mb-8">
         {steps.map((step, index, arr) => {
           let textColorClass = 'text-gray-500';
-          if (currentStep === step.number) {
-            textColorClass = 'text-blue-500';
-          } else if (currentStep > step.number) {
-            textColorClass = 'text-green-500';
-          }
+          if (currentStep === step.number) textColorClass = 'text-brand-500';
+          else if (currentStep > step.number) textColorClass = 'text-green-500';
           
           const hasAfterContent = index < arr.length - 1;
           const iconClassName = getStepIconClass(step.number);
           
           return (
-            <li 
-              key={step.number} 
-              className={`flex items-center ${textColorClass} ${
-                hasAfterContent ? "w-full after:content-[''] after:w-full after:h-1 after:border-b after:border-gray-600 after:border-1 after:inline-block" : ''
-              } ${index > 0 ? 'md:w-full' : ''}`}
-            >
-              <span className={`flex items-center justify-center ${
-                hasAfterContent ? 'after:content-["/"] sm:after:hidden after:mx-2 after:text-gray-500' : ''
-              }`}>
+            <li key={step.number} className={`flex items-center ${textColorClass} ${hasAfterContent ? "w-full after:content-[''] after:w-full after:h-1 after:border-b after:border-elevated-border after:border-1 after:inline-block" : ''} ${index > 0 ? 'md:w-full' : ''}`}>
+              <span className={`flex items-center justify-center ${hasAfterContent ? 'after:content-["/"] sm:after:hidden after:mx-2 after:text-gray-500' : ''}`}>
                 <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 shrink-0 mr-2 ${iconClassName}`}>
                   {currentStep > step.number ? <Check size={16} /> : <span>{step.number}</span>}
                 </div>
@@ -887,18 +791,12 @@ const UploadVideo = () => {
   };
 
   const renderContent = () => {
-    if (uploadStatus === 'uploading') {
-      return renderUploadProgress();
-    }
+    if (uploadStatus === 'uploading') return renderUploadProgress();
     switch (currentStep) {
-      case 1:
-        return renderMetadataForm();
-      case 2:
-        return renderFileUploadForm();
-      case 3:
-        return renderSuccessMessage();
-      default:
-        return <p className="text-center text-gray-300">Loading...</p>;
+      case 1: return renderMetadataForm();
+      case 2: return renderFileUploadForm();
+      case 3: return renderSuccessMessage();
+      default: return <p className="text-center text-gray-300">Loading...</p>;
     }
   };
 
@@ -909,16 +807,11 @@ const UploadVideo = () => {
       {renderSteps()}
       {renderAlert()}
 
-      <Card className="bg-gray-800 border-gray-700 shadow-lg p-6">
+      <div className="bg-elevated border border-elevated-border shadow-lg rounded-xl p-6">
         {renderContent()}
-      </Card>
+      </div>
 
-      <canvas 
-        ref={thumbnailCanvasRef} 
-        className="hidden" 
-        width={TARGET_WIDTH} 
-        height={TARGET_HEIGHT}
-      />
+      <canvas ref={thumbnailCanvasRef} className="hidden" width={TARGET_WIDTH} height={TARGET_HEIGHT} />
     </div>
   );
 };

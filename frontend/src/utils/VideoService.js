@@ -352,7 +352,7 @@ class VideoService {
     
     try {
       console.log(`Fetching shared video with token: ${shareToken}`);
-      const response = await ApiService.get(`shared/${shareToken}/`);
+      const response = await ApiService.get(`video/${shareToken}/`);
       console.log(`Fetched shared video:`, response);
       return response;
     } catch (error) {

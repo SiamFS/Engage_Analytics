@@ -1,16 +1,17 @@
-import React, { useState, useEffect, useCallback, useContext } from 'react';
+import React, { useState, useEffect, useCallback, useContext, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import { motion, AnimatePresence } from 'framer-motion';
 import {  
-  Avatar,
   Modal,
   TextInput,
   Alert,
-  Button as FlowbiteButton
+  Button as FlowbiteButton,
+  Badge
 } from 'flowbite-react';
 import { 
   ThumbsUp, 
+  ThumbsDown,
   Share2, 
   ArrowLeft,
   Calendar,
@@ -21,7 +22,9 @@ import {
   Trash,
   Eye,
   EyeOff,
-  BarChart2 as ChartBar
+  BarChart2 as ChartBar,
+  User,
+  Clock,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -31,188 +34,11 @@ import VideoService from '../../../utils/VideoService';
 import VideoPlayer from '../../Shared/VideoPlayer/VideoPlayer';
 import { LoadingState, ErrorState } from '../../Shared/VideoLoadingStates/VideoLoadingStates';
 import { AuthContext } from '../../../contexts/AuthProvider/AuthProvider';
+import getPlaceholderImage from '../../../utils/getPlaceholderImage';
 
-// Modern primary action button component
-const PrimaryButton = ({ icon, label, onClick, disabled = false, count, active = false }) => {
-  const Icon = icon;
-  
-  return (
-    <motion.button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="relative group shadow-lg h-auto overflow-hidden disabled:opacity-60"
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
-      transition={{ duration: 0.2 }}
-    >
-      <span className={`absolute inset-0 w-full h-full ${active 
-        ? 'bg-gradient-to-r from-blue-600 to-blue-800' 
-        : 'bg-gradient-to-r from-blue-500 to-blue-700'} rounded-[12px] sm:rounded-[14px] shadow-md`} />
-      <span className="absolute inset-0 w-full h-full bg-white/10 rounded-[12px] sm:rounded-[14px] blur-[1px]" />
-      <span className={`absolute inset-0 w-full h-full ${active 
-        ? 'bg-blue-700' 
-        : 'bg-blue-600'} rounded-[12px] sm:rounded-[14px] transform transition-transform group-hover:scale-[1.02] group-hover:brightness-110`} />
-      <span className="relative flex items-center justify-center text-white font-medium py-2 sm:py-2.5 px-4 text-sm">
-        {disabled ? (
-          <div className="flex items-center">
-            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            Loading...
-          </div>
-        ) : (
-          <>
-            <Icon size={18} className="mr-2" />
-            {label}
-            {count !== undefined && <span className="ml-2">({count})</span>}
-          </>
-        )}
-      </span>
-    </motion.button>
-  );
-};
-
-// Secondary button component
-const SecondaryButton = ({ icon, label, onClick, disabled = false }) => {
-  const Icon = icon;
-  
-  return (
-    <motion.button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="py-2 px-4 bg-gray-700 hover:bg-gray-600 text-white rounded-[12px] text-sm font-medium transition-colors disabled:opacity-50 flex items-center"
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
-    >
-      <Icon size={16} className="mr-2" />
-      {label}
-    </motion.button>
-  );
-};
-
-const VideoHeader = ({ video, handleBack, handleLike, handleShare, liked }) => {
-  const formattedDate = video.upload_date 
-    ? new Date(video.upload_date).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      })
-    : 'Unknown date';
-    
-  return (
-    <>
-      <motion.button
-        onClick={handleBack}
-        className="mb-4 flex items-center px-3 py-2 bg-gray-700/50 text-gray-200 hover:bg-gray-600 rounded-[12px] border border-gray-600 transition-colors"
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
-      >
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        Back
-      </motion.button>
-      
-      <h1 className="text-2xl font-bold text-white mb-2">
-        {video.title}
-      </h1>
-      
-      <div className="flex flex-wrap items-center justify-between">
-        <div className="flex items-center text-gray-400 text-sm mb-4">
-          <span className="mr-3">{video.views || 0} views</span>
-          
-          <div className="flex items-center">
-            <Calendar className="h-4 w-4 mr-1" />
-            <span>{formattedDate}</span>
-          </div>
-          
-          {video.category && (
-            <div className="flex items-center ml-3">
-              <Tag className="h-4 w-4 mr-1" />
-              <span>{video.category}</span>
-            </div>
-          )}
-        </div>
-      
-        <div className="flex flex-wrap gap-3 mb-4">
-          <PrimaryButton 
-            icon={ThumbsUp}
-            label={liked ? 'Liked' : 'Like'}
-            onClick={handleLike}
-            count={video.likes || 0}
-            active={liked}
-          />
-          
-          <SecondaryButton
-            icon={Share2}
-            label="Share"
-            onClick={handleShare}
-          />
-        </div>
-      </div>
-    </>
-  );
-};
-
-// Separate component for the uploader info
-const UploaderInfo = ({ video }) => {
-  const { user } = useContext(AuthContext);
-  const isRegularUser = user && user.role === 'user';
-  
-  return (
-    <div className="flex items-center mb-6">
-      <div className="h-10 w-10 rounded-full bg-gray-600 overflow-hidden flex-shrink-0">
-        <Avatar rounded size="md" />
-      </div>
-      <div className="ml-3">
-        <p className="text-white font-medium">
-          {isRegularUser 
-            ? (video.uploader_name || 'Uploaded by Admin') 
-            : (video.uploader_name || video.uploader?.email || 'Video Creator')}
-        </p>
-        {isRegularUser ? (
-          <p className="text-blue-400 text-sm flex items-center">
-            <ChartBar size={14} className="mr-1" />
-            Engage Analytics
-          </p>
-        ) : (
-          <p className="text-gray-400 text-sm">
-            {video.uploader_email || video.uploader?.email || 'Creator'}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-};
-
-UploaderInfo.propTypes = {
-  video: PropTypes.shape({
-    uploader_name: PropTypes.string,
-    uploader_email: PropTypes.string,
-    uploader: PropTypes.shape({
-      email: PropTypes.string
-    })
-  }).isRequired
-};
-
-// Separate component for the description section
-const VideoDescription = ({ description }) => (
-  <motion.div 
-    initial={{ opacity: 0, y: 10 }}
-    animate={{ opacity: 1, y: 0 }}
-    className="bg-gray-700/50 p-4 rounded-[14px] border border-gray-600"
-  >
-    <h2 className="text-white font-medium mb-2">Description</h2>
-    <p className="text-gray-300 whitespace-pre-line">
-      {description || 'No description provided.'}
-    </p>
-  </motion.div>
-);
-
-VideoDescription.propTypes = {
-  description: PropTypes.string
-};
+const MODAL_THEME = { content: { inner: 'relative flex max-h-[90dvh] flex-col rounded-lg bg-elevated shadow' } };
+const PRIMARY_BUTTON_CLASS = "inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0";
+const ACTION_BUTTON_CLASS = "inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200";
 
 const ShareModal = ({ isOpen, onClose, videoId, videoTitle }) => {
   const [shareUrl, setShareUrl] = useState('');
@@ -236,7 +62,8 @@ const ShareModal = ({ isOpen, onClose, videoId, videoTitle }) => {
             setError('Could not generate share link.');
           }
         } catch (err) {
-          setError('Failed to create share link. Please try again.');
+          const message = err?.response?.data?.error || err?.message || 'Failed to create share link. Please try again.';
+          setError(message);
           console.error('Share link creation failed:', err);
         } finally {
           setIsLoading(false);
@@ -262,13 +89,11 @@ const ShareModal = ({ isOpen, onClose, videoId, videoTitle }) => {
   };
 
   return (
-    <Modal show={isOpen} onClose={onClose} size="md">
-      <Modal.Header className="bg-gray-800 text-white border-b border-gray-700">
-        <p className="text-white">
-        Share "{videoTitle}"
-        </p>
+    <Modal show={isOpen} onClose={onClose} size="md" theme={MODAL_THEME}>
+      <Modal.Header className="bg-elevated text-white border-b border-elevated-border rounded-t-xl">
+        <p className="text-white text-lg font-semibold">Share &quot;{videoTitle}&quot;</p>
       </Modal.Header>
-      <Modal.Body className="bg-gray-800 text-gray-300">
+      <Modal.Body className="bg-elevated text-gray-300">
         <AnimatePresence mode="wait">
           {error && (
             <motion.div
@@ -276,7 +101,7 @@ const ShareModal = ({ isOpen, onClose, videoId, videoTitle }) => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
             >
-              <Alert color="failure" className="mb-4">
+              <Alert color="failure" className="mb-4 rounded-lg border border-red-800/40">
                 {error}
               </Alert>
             </motion.div>
@@ -284,46 +109,57 @@ const ShareModal = ({ isOpen, onClose, videoId, videoTitle }) => {
         </AnimatePresence>
         
         {isLoading ? (
-          <div className="flex items-center justify-center p-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-            <span className="ml-2">Generating share link...</span>
+          <div className="flex items-center justify-center p-6">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-brand-500"></div>
+            <span className="ml-3 text-gray-400 text-sm">Generating share link...</span>
           </div>
         ) : (
           <>
-            <p className="mb-4">Share this video with others using this unique link:</p>
-            <div className="flex items-center gap-2">
-              <TextInput
-                icon={LinkIcon}
-                value={shareUrl}
-                readOnly
-                className="flex-1"
-                onChange={() => {}}
-              />
-              <PrimaryButton 
-                icon={Copy} 
-                label={isCopied ? 'Copied!' : 'Copy'} 
-                onClick={copyToClipboard} 
-              />
-            </div>
-            
-            <AnimatePresence>
-              {isCopied && (
-                <motion.p 
-                  initial={{ opacity: 0, y: 5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  className="mt-2 text-sm text-green-400"
-                >
-                  Link copied to clipboard!
-                </motion.p>
-              )}
-            </AnimatePresence>
-            
-            <div className="mt-6">
-              <p className="text-sm text-gray-400">
-                This link allows anyone to view this video, even if it's set to private.
-              </p>
-            </div>
+            {!error && shareUrl && (
+              <>
+                <p className="mb-4 text-sm text-gray-400">Share this video with others using this unique link:</p>
+                <div className="flex items-center gap-2">
+                  <TextInput
+                    icon={LinkIcon}
+                    value={shareUrl}
+                    readOnly
+                    className="flex-1"
+                    onChange={() => {}}
+                  />
+                  <button
+                    onClick={copyToClipboard}
+                    className={`${PRIMARY_BUTTON_CLASS} shrink-0 ${isCopied ? 'bg-green-600 text-white' : 'bg-brand-600 hover:bg-brand-500 text-white'}`}
+                    type="button"
+                  >
+                    {isCopied ? (
+                      <><Copy size={16} /><span>Copied!</span></>
+                    ) : (
+                      <><Copy size={16} /><span>Copy</span></>
+                    )}
+                  </button>
+                </div>
+                
+                <AnimatePresence>
+                  {isCopied && (
+                    <motion.p 
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      className="mt-2 text-sm text-green-400"
+                    >
+                      Link copied to clipboard!
+                    </motion.p>
+                  )}
+                </AnimatePresence>
+                
+                <div className="mt-6 p-3 rounded-lg bg-surface-600/40 border border-elevated-border/30">
+                  <p className="text-xs text-gray-500">
+                    Anyone with this link can view this video.
+                  </p>
+                </div>
+              </>
+            )}
+            {error && !shareUrl && <div className="h-4" />}
           </>
         )}
       </Modal.Body>
@@ -331,66 +167,63 @@ const ShareModal = ({ isOpen, onClose, videoId, videoTitle }) => {
   );
 };
 
-// Related video card component
+ShareModal.propTypes = {
+  isOpen: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  videoId: PropTypes.oneOfType([
+    PropTypes.string,
+    PropTypes.number
+  ]),
+  videoTitle: PropTypes.string
+};
+
 const RelatedVideoCard = ({ video, onClick }) => (
   <motion.div 
     initial={{ opacity: 0, y: 10 }}
     animate={{ opacity: 1, y: 0 }}
-    className="bg-gray-800/80 border border-gray-700 hover:bg-gray-700/80 transition-colors cursor-pointer rounded-[14px] overflow-hidden"
+    className="bg-surface-600/60 backdrop-blur-sm border border-elevated-border/50 hover:bg-surface-500/60 hover:border-elevated-border transition-all duration-200 cursor-pointer rounded-xl overflow-hidden group"
     onClick={onClick}
-    whileHover={{ scale: 1.02, y: -2 }}
+    whileHover={{ y: -2 }}
     whileTap={{ scale: 0.98 }}
   >
-    <div className="flex flex-col sm:flex-row p-3">
-      <div className="w-full sm:w-24 h-24 sm:h-auto flex-shrink-0 mb-2 sm:mb-0">
+    <div className="flex gap-3 p-3">
+      <div className="w-24 h-16 shrink-0 rounded-lg overflow-hidden">
         <img 
-          src={video.thumbnail_url || '/api/placeholder/400/225'} 
+          src={video.thumbnail_url || getPlaceholderImage(400, 225, video.title)} 
           alt={video.title}
-          className="w-full h-full object-cover rounded-lg"
+          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
           loading="lazy"
         />
       </div>
-      <div className="sm:ml-3 flex-grow">
-        <h5 className="text-sm font-medium text-white line-clamp-2">
+      <div className="min-w-0 flex-1">
+        <h5 className="text-sm font-medium text-white line-clamp-2 leading-snug group-hover:text-brand-400 transition-colors">
           {video.title}
         </h5>
-        <p className="text-xs text-gray-400 mt-1">
-          {video.uploader_name || video.uploader?.email || 'Creator'}
-        </p>
         <p className="text-xs text-gray-500 mt-1">
-          {video.views || 0} views • {VideoService.formatRelativeTime(video.upload_date)}
+          {video.uploader_name || 'Creator'} &middot; {video.views || 0} views
+        </p>
+        <p className="text-xs text-gray-600 mt-0.5">
+          {VideoService.formatRelativeTime(video.upload_date)}
         </p>
       </div>
     </div>
   </motion.div>
 );
 
-// Separate component for related videos
-const RelatedVideos = ({ videos, navigate }) => (
-  <motion.div
-    initial={{ opacity: 0 }}
-    animate={{ opacity: 1 }}
-  >
-    <h3 className="text-lg font-medium text-white mb-4">Related Videos</h3>
-    
-    {videos.length > 0 ? (
-      <div className="space-y-4">
-        {videos.map(relatedVideo => (
-          <RelatedVideoCard 
-            key={relatedVideo.id}
-            video={relatedVideo}
-            onClick={() => navigate(`/video/${relatedVideo.uuid || relatedVideo.id}`)} 
-          />
-        ))}
-      </div>
-    ) : (
-      <div className="text-center text-gray-400 p-6 bg-gray-800/80 rounded-[14px] border border-gray-700">
-        No related videos found.
-      </div>
-    )}
-
-  </motion.div>
-);
+RelatedVideoCard.propTypes = {
+  video: PropTypes.shape({
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+    title: PropTypes.string,
+    thumbnail_url: PropTypes.string,
+    uploader_name: PropTypes.string,
+    uploader: PropTypes.shape({
+      email: PropTypes.string
+    }),
+    views: PropTypes.number,
+    upload_date: PropTypes.string
+  }).isRequired,
+  onClick: PropTypes.func.isRequired
+};
 
 const VideoDetail = () => {
   const { id } = useParams();
@@ -404,6 +237,7 @@ const VideoDetail = () => {
   const [viewRecorded, setViewRecorded] = useState(false);
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [visibilityModalOpen, setVisibilityModalOpen] = useState(false);
   const [myEmotion, setMyEmotion] = useState(null);
   const [myEmotionLoading, setMyEmotionLoading] = useState(false);
 
@@ -419,10 +253,8 @@ const VideoDetail = () => {
         setVideo(videoData);
         setLiked(!!videoData.is_liked);
         
-        // Call fetchRelatedVideos without awaiting it
         fetchRelatedVideos(videoData);
-
-        fetchMyEmotion(id);
+        fetchMyEmotion(videoData?.id);
 
         setLoading(false);
       } catch (error) {
@@ -444,23 +276,44 @@ const VideoDetail = () => {
 
     const fetchRelatedVideos = async (currentVideo) => {
       if (!currentVideo) return;
-      
+
+      const currentId = currentVideo.id;
+      const currentCategory = currentVideo.category;
+      const currentUploaderEmail = currentVideo.uploader?.email;
+
       try {
         const videoFeedResult = VideoService.getVideoFeed();
         const videoFeed = await (videoFeedResult instanceof Promise ? videoFeedResult : Promise.resolve(videoFeedResult));
-        if (Array.isArray(videoFeed) && videoFeed.length > 0) {
-          const related = videoFeed
-            .filter(v => v.id !== currentVideo.id) 
-            .filter(v => 
-              v.category === currentVideo.category || 
-              (v.uploader?.email === currentVideo.uploader?.email)
-            )
-            .slice(0, 4);
-            
-          setRelatedVideos(related);
+
+        if (!Array.isArray(videoFeed)) {
+          setRelatedVideos([]);
+          return;
         }
+
+        const others = videoFeed.filter(v => v && v.id !== currentId);
+
+        const sameCategory = others.filter(v =>
+          currentCategory && v.category && v.category === currentCategory
+        );
+
+        const sameUploader = others.filter(v =>
+          currentUploaderEmail && v.uploader?.email === currentUploaderEmail && !sameCategory.some(sc => sc.id === v.id)
+        );
+
+        const scored = sameCategory.concat(sameUploader).map(v => ({
+          ...v,
+          _score: sameCategory.some(sc => sc.id === v.id) ? 1 : 0.5,
+        }));
+
+        scored.sort((a, b) => {
+          if (b._score !== a._score) return b._score - a._score;
+          return (b.views || 0) - (a.views || 0);
+        });
+
+        setRelatedVideos(scored.slice(0, 4));
       } catch (relatedError) {
         console.error('Error fetching related videos:', relatedError);
+        setRelatedVideos([]);
       }
     };
 
@@ -490,10 +343,11 @@ const VideoDetail = () => {
   };
 
   const recordView = useCallback(async () => {
-    if (!id || viewRecorded) return;
+    const pk = video?.id;
+    if (!pk || viewRecorded) return;
     
     try {
-      const recordResult = VideoService.recordVideoView(id);
+      const recordResult = VideoService.recordVideoView(pk);
       await (recordResult instanceof Promise ? recordResult : Promise.resolve(recordResult));
       setViewRecorded(true);
       
@@ -504,27 +358,42 @@ const VideoDetail = () => {
     } catch (error) {
       console.error('Error recording view:', error);
     }
-  }, [id, viewRecorded]);
+  }, [video?.id, viewRecorded]);
 
   const handleLike = async () => {
-    if (!id) return;
-    
+    const pk = video?.id;
+    if (!pk) return;
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+
+    const prevLiked = liked;
+    const prevLikes = video.likes || 0;
+    setLiked(!prevLiked);
+    setVideo(prev => ({
+      ...prev,
+      likes: prevLiked ? Math.max(0, prevLikes - 1) : prevLikes + 1,
+    }));
+
     try {
-      const likeResult = VideoService.toggleVideoLike(id);
+      const likeResult = VideoService.toggleVideoLike(pk);
       const response = await (likeResult instanceof Promise ? likeResult : Promise.resolve(likeResult));
-      
+
       if (response) {
-        const newLikedStatus = response.liked;
-        setLiked(newLikedStatus);
-        
+        setLiked(response.liked);
         setVideo(prev => ({
           ...prev,
-          likes: response.likes
+          likes: response.likes,
         }));
       }
     } catch (error) {
       console.error('Error liking video:', error);
-      alert('Failed to update like status. Please try again.');
+      setLiked(prevLiked);
+      setVideo(prev => ({
+        ...prev,
+        likes: prevLikes,
+      }));
     }
   };
 
@@ -536,11 +405,12 @@ const VideoDetail = () => {
     console.log('Video playback ended');
   };
 
-  // Admin functions
   const handleToggleVisibility = async () => {
+    const pk = video?.id;
+    if (!pk) return;
     try {
       const newVisibility = video.visibility === 'private' ? 'public' : 'private';
-      const visibilityResult = VideoService.adminUpdateVideoVisibility(id, newVisibility);
+      const visibilityResult = VideoService.adminUpdateVideoVisibility(pk, newVisibility);
       await (visibilityResult instanceof Promise ? visibilityResult : Promise.resolve(visibilityResult));
       setVideo({
         ...video,
@@ -554,8 +424,10 @@ const VideoDetail = () => {
   };
 
   const handleDeleteVideo = async () => {
+    const pk = video?.id;
+    if (!pk) return;
     try {
-      const deleteResult = VideoService.adminDeleteVideo(id);
+      const deleteResult = VideoService.adminDeleteVideo(pk);
       await (deleteResult instanceof Promise ? deleteResult : Promise.resolve(deleteResult));
       navigate('/dashboard', { replace: true });
     } catch (error) {
@@ -583,16 +455,23 @@ const VideoDetail = () => {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-gray-800/80 backdrop-blur-md rounded-[16px] border border-gray-700 shadow-md p-5 mb-6"
+        className="bg-surface-600/60 backdrop-blur-sm rounded-xl border border-elevated-border/50 p-5 mt-6"
       >
-        <h3 className="text-lg font-medium text-white mb-4">Your Reaction</h3>
-        <ResponsiveContainer width="100%" height={240}>
+        <h3 className="text-base font-semibold text-white mb-4 flex items-center gap-2">
+          <ChartBar size={16} className="text-brand-400" />
+          Your Reaction
+        </h3>
+        <ResponsiveContainer width="100%" height={220}>
           <LineChart data={myEmotion.timeline}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-            <XAxis dataKey="t" stroke="#9ca3af" tickFormatter={(t) => `${t}s`} />
-            <YAxis stroke="#9ca3af" domain={[0, 1]} />
-            <RTooltip formatter={(v) => `${(v * 100).toFixed(0)}%`} labelFormatter={(t) => `${t}s`} />
-            <Legend />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgb(59,68,87)" strokeOpacity={0.5} />
+            <XAxis dataKey="t" stroke="#767d95" tickFormatter={(t) => `${t}s`} tick={{ fontSize: 11 }} />
+            <YAxis stroke="#767d95" domain={[0, 1]} tick={{ fontSize: 11 }} />
+            <RTooltip 
+              formatter={(v) => `${(v * 100).toFixed(0)}%`} 
+              labelFormatter={(t) => `${t}s`}
+              contentStyle={{ backgroundColor: '#1a1d29', border: '1px solid rgb(59,68,87)', borderRadius: '8px' }}
+            />
+            <Legend wrapperStyle={{ fontSize: '11px' }} />
             {emotionKeys.map((e) => (
               <Line
                 key={e.key}
@@ -602,6 +481,7 @@ const VideoDetail = () => {
                 stroke={e.color}
                 dot={false}
                 isAnimationActive={false}
+                strokeWidth={1.5}
               />
             ))}
           </LineChart>
@@ -610,33 +490,15 @@ const VideoDetail = () => {
     );
   };
 
-  const renderAdminControls = () => {
-    // Only show for admin users
-    if (!user || user.role !== 'admin') return null;
-    
-    return (
-      <div className="bg-gray-800/80 backdrop-blur-md rounded-[16px] border border-gray-700 shadow-md p-5 mb-6">
-        <h3 className="text-lg font-medium text-white mb-4">Admin Controls</h3>
-        <div className="flex flex-wrap gap-3">
-          <PrimaryButton 
-            icon={Edit}
-            label="Edit Video"
-            onClick={() => navigate(`/dashboard/edit-video/${id}`)}
-          />
-          <SecondaryButton
-            icon={Trash}
-            label="Delete Video"
-            onClick={() => setDeleteModalOpen(true)}
-          />
-          <SecondaryButton
-            icon={video?.visibility === 'private' ? Eye : EyeOff}
-            label={video?.visibility === 'private' ? 'Make Public' : 'Make Private'}
-            onClick={handleToggleVisibility}
-          />
-        </div>
-      </div>
-    );
-  };
+  const formattedDate = video?.upload_date 
+    ? new Date(video.upload_date).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      })
+    : '';
+
+  const isAdmin = user?.role === 'admin';
 
   if (loading) {
     return <LoadingState message="Loading video..." />;
@@ -661,149 +523,213 @@ const VideoDetail = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
+    <div className="max-w-6xl mx-auto px-4 py-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-6">
           <motion.div 
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-4 rounded-lg overflow-hidden shadow-xl"
+            className="rounded-xl overflow-hidden shadow-2xl relative"
           >
+            <button
+              onClick={() => window.history.length > 1 ? window.history.back() : navigate('/videos')}
+              className="absolute top-4 left-4 z-40 flex items-center gap-1.5 bg-surface/70 backdrop-blur-sm hover:bg-surface-600 text-white px-3 py-1.5 rounded-lg transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
+              type="button"
+              aria-label="Go back"
+            >
+              <ArrowLeft size={16} />
+              <span className="text-xs font-medium hidden sm:inline">Back</span>
+            </button>
             <VideoPlayer 
               videoUrl={video.video_url}
               thumbnailUrl={video.thumbnail_url}
               title={video.title}
-              videoId={id}
+              videoId={video?.id}
               onPlay={recordView}
               onEnded={handleVideoEnded}
             />
           </motion.div>
 
-          {/* Admin Controls - Only visible for admins */}
-          {renderAdminControls()}
-    
+          {isAdmin && (
+            <div className="bg-surface-600/60 backdrop-blur-sm rounded-xl border border-elevated-border/50 p-4">
+              <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-brand-400" />
+                Admin Controls
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => navigate(`/dashboard/edit-video/${id}`)}
+                  className={`${ACTION_BUTTON_CLASS} bg-brand-600/20 text-brand-300 hover:bg-brand-600/30 border border-brand-600/30`}
+                  type="button"
+                >
+                  <Edit size={14} /> Edit
+                </button>
+                <button
+                  onClick={() => setDeleteModalOpen(true)}
+                  className={`${ACTION_BUTTON_CLASS} bg-red-600/20 text-red-300 hover:bg-red-600/30 border border-red-600/30`}
+                  type="button"
+                >
+                  <Trash size={14} /> Delete
+                </button>
+                <button
+                  onClick={() => setVisibilityModalOpen(true)}
+                  className={`${ACTION_BUTTON_CLASS} bg-surface-600 text-gray-300 hover:bg-surface-500 border border-elevated-border/50`}
+                  type="button"
+                >
+                  {video?.visibility === 'private' ? <Eye size={14} /> : <EyeOff size={14} />}
+                  {video?.visibility === 'private' ? 'Make Public' : 'Make Private'}
+                </button>
+              </div>
+            </div>
+          )}
+
           <motion.div 
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-gray-800/80 backdrop-blur-md rounded-[16px] border border-gray-700 shadow-md p-5 mb-6"
+            className="bg-surface-600/60 backdrop-blur-sm rounded-xl border border-elevated-border/50 p-6"
           >
-            <VideoHeader 
-              video={video} 
-              handleBack={handleBack} 
-              handleLike={handleLike}
-              handleShare={handleShare}
-              liked={liked}
-            />
-            
-            <hr className="border-gray-700 my-4" />
-            
-            <UploaderInfo video={video} />
-            <VideoDescription description={video.description} />
+            <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-xl font-bold text-white mb-2">{video.title}</h1>
+                <div className="flex flex-wrap items-center gap-3 text-xs text-gray-400">
+                  <span className="flex items-center gap-1"><Eye size={13} /> {video.views || 0} views</span>
+                  <span className="flex items-center gap-1"><Calendar size={13} /> {formattedDate}</span>
+                  {video.category && (
+                    <span className="flex items-center gap-1"><Tag size={13} /> {video.category}</span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={handleLike}
+                  className={`${ACTION_BUTTON_CLASS} ${
+                    liked
+                    ? 'bg-brand-600/20 text-brand-300 border border-brand-600/30'
+                    : 'bg-surface-600 text-gray-300 border border-elevated-border/50 hover:bg-surface-500'
+                  }`}
+                  type="button"
+                >
+                  <ThumbsUp size={15} fill={liked ? 'currentColor' : 'none'} className={liked ? 'text-brand-400' : ''} />
+                  {video.likes || 0}
+                </button>
+                <button
+                  onClick={handleShare}
+                  className={`${ACTION_BUTTON_CLASS} bg-surface-600 text-gray-300 border border-elevated-border/50 hover:bg-surface-500`}
+                  type="button"
+                >
+                  <Share2 size={15} /> Share
+                </button>
+              </div>
+            </div>
+
+            <hr className="border-elevated-border/50 my-4" />
+
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-full bg-surface-500 overflow-hidden shrink-0 flex items-center justify-center">
+                {video.uploader?.avatar_url ? (
+                  <img src={video.uploader.avatar_url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <User size={18} className="text-gray-400" />
+                )}
+              </div>
+              <div>
+                <p className="text-sm font-medium text-white">
+                  {video.uploader_name || video.uploader?.email || 'Video Creator'}
+                </p>
+                <p className="text-xs text-brand-400 flex items-center gap-1">
+                  <ChartBar size={12} />
+                  Engage Analytics
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-surface-500/30 rounded-xl p-4 border border-elevated-border/20">
+              <h2 className="text-sm font-semibold text-white mb-2">Description</h2>
+              <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-line">
+                {video.description || 'No description provided.'}
+              </p>
+            </div>
 
             {renderMyEmotion()}
           </motion.div>
         </div>
+
         <div className="lg:col-span-1">
-          <RelatedVideos videos={relatedVideos} navigate={navigate} />
+          <div className="sticky top-24 space-y-4">
+            <h3 className="text-base font-semibold text-white flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+              Related Videos
+            </h3>
+            
+            <div className="space-y-3">
+              {relatedVideos.length > 0 ? (
+                relatedVideos.map(relatedVideo => (
+                  <RelatedVideoCard 
+                    key={relatedVideo.id}
+                    video={relatedVideo}
+                    onClick={() => navigate(`/video/${relatedVideo.uuid || relatedVideo.id}`)} 
+                  />
+                ))
+              ) : (
+                <div className="text-center text-gray-500 text-sm p-6 bg-surface-600/40 rounded-xl border border-elevated-border/30">
+                  No related videos found.
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
+
       <ShareModal 
         isOpen={shareModalOpen} 
         onClose={() => setShareModalOpen(false)} 
-        videoId={id}
+        videoId={video?.id}
         videoTitle={video.title} 
       />
       
-      {/* Delete Video Confirmation Modal */}
-      <Modal show={deleteModalOpen} onClose={() => setDeleteModalOpen(false)}>
-        <Modal.Header className="bg-gray-800 text-white border-b border-gray-700">
-          Delete Video
+      <Modal show={deleteModalOpen} onClose={() => setDeleteModalOpen(false)} theme={MODAL_THEME}>
+        <Modal.Header className="bg-elevated text-white border-b border-elevated-border rounded-t-xl">
+          <span className="text-white">Delete Video</span>
         </Modal.Header>
-        <Modal.Body className="bg-gray-800 text-white">
-          <p className="mb-2">Are you sure you want to delete "{video?.title}"?</p>
-          <p className="text-red-400">This action cannot be undone.</p>
+        <Modal.Body className="bg-elevated text-white">
+          <p className="mb-2">Are you sure you want to delete &quot;{video?.title}&quot;?</p>
+          <p className="text-red-400 text-sm">This action cannot be undone.</p>
         </Modal.Body>
-        <Modal.Footer className="bg-gray-800 border-t border-gray-700">
-          <FlowbiteButton color="failure" onClick={handleDeleteVideo}>
+        <Modal.Footer className="bg-elevated border-t border-elevated-border">
+          <FlowbiteButton color="failure" onClick={handleDeleteVideo} className="!bg-red-600 hover:!bg-red-700">
             Delete Permanently
           </FlowbiteButton>
-          <FlowbiteButton color="gray" onClick={() => setDeleteModalOpen(false)}>
+          <FlowbiteButton color="gray" onClick={() => setDeleteModalOpen(false)} className="!bg-surface-600 hover:!bg-surface-500 !text-white">
+            Cancel
+          </FlowbiteButton>
+        </Modal.Footer>
+      </Modal>
+      
+      <Modal show={visibilityModalOpen} onClose={() => setVisibilityModalOpen(false)} theme={MODAL_THEME}>
+        <Modal.Header className="bg-elevated text-white border-b border-elevated-border rounded-t-xl">
+          <span className="text-white">Change Visibility</span>
+        </Modal.Header>
+        <Modal.Body className="bg-elevated text-white">
+          <p className="mb-2">
+            Are you sure you want to make this video <strong>{video?.visibility === 'private' ? 'public' : 'private'}</strong>?
+          </p>
+          <p className="text-gray-400 text-sm">
+            {video?.visibility === 'private'
+              ? 'Anyone with the link will be able to view this video.'
+              : 'Only you and admins will be able to view this video.'}
+          </p>
+        </Modal.Body>
+        <Modal.Footer className="bg-elevated border-t border-elevated-border">
+          <FlowbiteButton color="blue" onClick={() => { setVisibilityModalOpen(false); handleToggleVisibility(); }} className="!bg-brand-600 hover:!bg-brand-700">
+            Confirm
+          </FlowbiteButton>
+          <FlowbiteButton color="gray" onClick={() => setVisibilityModalOpen(false)} className="!bg-surface-600 hover:!bg-surface-500 !text-white">
             Cancel
           </FlowbiteButton>
         </Modal.Footer>
       </Modal>
     </div>
   );
-};
-
-
-PrimaryButton.propTypes = {
-  icon: PropTypes.elementType.isRequired,
-  label: PropTypes.string.isRequired,
-  onClick: PropTypes.func.isRequired,
-  disabled: PropTypes.bool,
-  count: PropTypes.number,
-  active: PropTypes.bool
-};
-
-SecondaryButton.propTypes = {
-  icon: PropTypes.elementType.isRequired,
-  label: PropTypes.string.isRequired,
-  onClick: PropTypes.func.isRequired,
-  disabled: PropTypes.bool
-};
-
-VideoHeader.propTypes = {
-  video: PropTypes.shape({
-    title: PropTypes.string,
-    views: PropTypes.number,
-    upload_date: PropTypes.string,
-    category: PropTypes.string,
-    likes: PropTypes.number
-  }).isRequired,
-  handleBack: PropTypes.func.isRequired,
-  handleLike: PropTypes.func.isRequired,
-  handleShare: PropTypes.func.isRequired,
-  liked: PropTypes.bool.isRequired,
-};
-
-RelatedVideoCard.propTypes = {
-  video: PropTypes.shape({
-    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
-    title: PropTypes.string,
-    thumbnail_url: PropTypes.string,
-    uploader_name: PropTypes.string,
-    uploader: PropTypes.shape({
-      email: PropTypes.string
-    }),
-    views: PropTypes.number,
-    upload_date: PropTypes.string
-  }).isRequired,
-  onClick: PropTypes.func.isRequired
-};
-
-ShareModal.propTypes = {
-  isOpen: PropTypes.bool.isRequired,
-  onClose: PropTypes.func.isRequired,
-  videoId: PropTypes.oneOfType([
-    PropTypes.string,
-    PropTypes.number
-  ]),
-  videoTitle: PropTypes.string
-};
-
-RelatedVideos.propTypes = {
-  videos: PropTypes.arrayOf(
-    PropTypes.shape({
-      id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
-      title: PropTypes.string,
-      thumbnail_url: PropTypes.string,
-      uploader_name: PropTypes.string,
-      views: PropTypes.number,
-      upload_date: PropTypes.string
-    })
-  ).isRequired,
-  navigate: PropTypes.func.isRequired
 };
 
 export default VideoDetail;

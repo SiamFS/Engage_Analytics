@@ -4,9 +4,8 @@ import { AuthContext } from '../../../contexts/AuthProvider/AuthProvider';
 import { updateProfile } from 'firebase/auth';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../../firebase/firebase.config';
-import { Button, Card, Label, TextInput, Avatar, Spinner, Toast } from 'flowbite-react';
-import { HiUser, HiMail, HiPhotograph, HiCheck, HiExclamation } from 'react-icons/hi';
-import { Camera, Upload, X } from 'lucide-react';
+import { Button, Card, Label, TextInput, Spinner, Toast } from 'flowbite-react';
+import { Camera, Upload, X, User, Mail, Image, Check, AlertTriangle } from 'lucide-react';
 import TokenService from '../../../utils/TokenService';
 
 const DEFAULT_AVATAR = "https://flowbite.com/docs/images/people/profile-picture-5.jpg";
@@ -20,27 +19,21 @@ const ProfileAvatar = ({
 }) => {
   const [imageError, setImageError] = useState(false);
   
-  // Reset image error when photo URL changes
   useEffect(() => {
     setImageError(false);
   }, [photoURL, previewImage]);
   
   return (
     <div className="relative group">
-      <div className="rounded-full overflow-hidden w-24 h-24 md:w-28 md:h-28 border-4 border-blue-600/30 shadow-lg shadow-blue-700/20 bg-gray-700 flex items-center justify-center">
+      <div className="rounded-full overflow-hidden w-24 h-24 md:w-28 md:h-28 border-4 border-brand-600/30 shadow-lg shadow-brand-700/20 bg-surface-600 flex items-center justify-center">
         {imageError ? (
-          <HiUser className="w-12 h-12 text-gray-400" />
+          <User className="w-12 h-12 text-gray-400" />
         ) : (
-          <Avatar 
-            img={previewImage || photoURL || DEFAULT_AVATAR} 
-            size="xl" 
-            rounded 
-            alt="Profile picture" 
+          <img
+            src={previewImage || photoURL || DEFAULT_AVATAR}
+            alt="Profile picture"
             className="w-full h-full object-cover"
-            onError={(e) => {
-              e.target.onerror = null;
-              setImageError(true);
-            }}
+            onError={() => setImageError(true)}
             loading="eager"
           />
         )}
@@ -50,9 +43,9 @@ const ProfileAvatar = ({
         <button
           type="button"
           onClick={onShowPhotoOptions}
-          className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+          className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200"
         >
-          <Camera size={24} className="text-blue-400" />
+          <Camera size={24} className="text-brand-400" />
         </button>
       )}
     </div>
@@ -75,7 +68,7 @@ const PhotoOptionsPanel = ({
   uploadError = '', 
   previewImage = null 
 }) => (
-  <div className="absolute top-full mt-2 bg-gray-800 rounded-lg shadow-lg p-4 z-20 w-full max-w-sm border border-gray-700">
+  <div className="absolute top-full mt-2 bg-elevated rounded-lg shadow-lg p-4 z-20 w-full max-w-sm border border-elevated-border">
     <div className="flex justify-between items-center mb-2">
       <h3 className="font-medium text-sm text-white">Update Profile Picture</h3>
       <button 
@@ -93,23 +86,23 @@ const PhotoOptionsPanel = ({
         <TextInput
           id="photoURL"
           type="text"
-          icon={HiPhotograph}
+          icon={Image}
           value={photoURL}
           onChange={onInputChange}
           placeholder="https://example.com/profile.jpg"
           sizing="sm"
-          className="mt-1 bg-gray-700 border-gray-600 text-white"
+          className="mt-1 bg-surface-600 border-elevated-border text-white"
         />
         <p className="mt-1 text-xs text-gray-400">
           Enter a URL to an image (PNG, JPG)
         </p>
       </div>
       
-      <div className="flex items-center justify-center border-2 border-dashed border-gray-600 rounded-lg p-4">
+      <div className="flex items-center justify-center border-2 border-dashed border-elevated-border rounded-lg p-4">
         <div className="text-center w-full">
           <label htmlFor="file-upload" className="cursor-pointer">
             {uploadLoading ? (
-              <Spinner className="mx-auto h-8 w-8 text-blue-500" />
+              <Spinner className="mx-auto h-8 w-8 text-brand-500" />
             ) : (
               <Upload className="mx-auto h-8 w-8 text-gray-400" />
             )}
@@ -132,7 +125,7 @@ const PhotoOptionsPanel = ({
           )}
           {previewImage && (
             <p className="mt-2 text-xs text-green-500 flex items-center justify-center">
-              <HiCheck className="mr-1" /> Image ready to save
+              <Check className="mr-1" /> Image ready to save
             </p>
           )}
         </div>
@@ -184,7 +177,7 @@ const InputField = ({
         onChange={onChange}
         required={required}
         disabled={disabled}
-        className={`w-full ${disabled ? 'bg-gray-800 text-gray-400' : 'bg-gray-700 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500'} border border-gray-600 rounded-lg text-sm px-2.5 py-2.5 pl-10 shadow-sm`}
+        className={`w-full ${disabled ? 'bg-surface-600 text-gray-400' : 'bg-surface-600 text-white focus:ring-2 focus:ring-brand-500 focus:border-brand-500'} border border-elevated-border rounded-lg text-sm px-2.5 py-2.5 pl-10 shadow-sm`}
       />
     </div>
   );
@@ -204,7 +197,7 @@ const EmailField = ({ email = '', isVerified = false }) => (
     <Label htmlFor="email" value="Email Address" className="text-xs font-medium text-gray-300" />
     <div className="mt-1 relative">
       <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-        <HiMail className="w-4 h-4 text-gray-400" />
+        <Mail className="w-4 h-4 text-gray-400" />
       </div>
       <input
         id="email"
@@ -212,17 +205,17 @@ const EmailField = ({ email = '', isVerified = false }) => (
         value={email || ''}
         disabled
         readOnly
-        className="w-full bg-gray-800 border border-gray-600 text-gray-400 rounded-lg text-sm px-2.5 py-2.5 pl-10 shadow-sm"
+        className="w-full bg-surface-600 border border-elevated-border text-gray-400 rounded-lg text-sm px-2.5 py-2.5 pl-10 shadow-sm"
       />
     </div>
     <div className="mt-1 flex items-center">
       {isVerified ? (
         <span className="text-xs text-green-500 flex items-center">
-          <HiCheck className="mr-1" /> Email verified
+          <Check className="mr-1" /> Email verified
         </span>
       ) : (
         <span className="text-xs text-red-500 flex items-center">
-          <HiExclamation className="mr-1" /> Email not verified
+          <AlertTriangle className="mr-1" /> Email not verified
         </span>
       )}
     </div>
@@ -268,7 +261,7 @@ TimelineItem.propTypes = {
 };
 
 const AccountInfoSection = ({ user = {}, lastUpdateTime }) => (
-  <div className="pt-3 border-t border-gray-700">
+  <div className="pt-3 border-t border-elevated-border">
     <h3 className="text-sm font-medium mb-3 text-gray-300">Account Information</h3>
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       <TimelineItem label="Account created" timestamp={user?.createdAt} />
@@ -301,9 +294,9 @@ const ToastMessage = ({ toast, onDismiss }) => {
     <Toast className="mb-6 mx-auto max-w-lg">
       <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
         {toast.type === 'success' ? (
-          <HiCheck className="h-5 w-5 text-green-500" />
+          <Check className="h-5 w-5 text-green-500" />
         ) : (
-          <HiExclamation className="h-5 w-5 text-red-500" />
+          <AlertTriangle className="h-5 w-5 text-red-500" />
         )}
       </div>
       <div className="ml-3 text-sm font-normal">{toast.message}</div>
@@ -329,7 +322,7 @@ const ActionButtons = ({ isEditing, loading, canEdit, onSave, onCancel, onEdit }
           color="dark" 
           onClick={onCancel}
           size="sm"
-          className="bg-gray-700 hover:bg-gray-600"
+          className="bg-surface-600 hover:bg-surface-500"
         >
           Cancel
         </Button>
@@ -337,7 +330,7 @@ const ActionButtons = ({ isEditing, loading, canEdit, onSave, onCancel, onEdit }
           type="submit" 
           disabled={loading}
           color="blue"
-          className="bg-blue-600 hover:bg-blue-700"
+          className="bg-brand-600 hover:bg-brand-700"
           size="sm"
           onClick={onSave}
         >
@@ -349,7 +342,7 @@ const ActionButtons = ({ isEditing, loading, canEdit, onSave, onCancel, onEdit }
       <Button 
         onClick={onEdit}
         color="blue"
-        className="bg-blue-600 hover:bg-blue-700"
+        className="bg-brand-600 hover:bg-brand-700"
         size="sm"
         disabled={!canEdit}
         title={!canEdit ? "Profile can only be updated once per day" : ""}
@@ -550,19 +543,16 @@ const usePhotoUpload = (setFormState, showToast) => {
     setUploadError('');
     
     try {
-      // Show preview immediately
       const reader = new FileReader();
       reader.onload = (e) => {
         setPreviewImage(e.target.result);
       };
       reader.readAsDataURL(file);
       
-      // Create FormData for ImgBB
       const formData = new FormData();
       formData.append('image', file);
       formData.append('key', IMGBB_API_KEY);
       
-      // Upload to ImgBB
       const response = await fetch('https://api.imgbb.com/1/upload', {
         method: 'POST',
         body: formData
@@ -681,8 +671,8 @@ const Profile = () => {
 
   if (!user) {
     return (
-      <div className="h-screen w-full flex items-center justify-center bg-gray-900">
-        <Spinner size="xl" color="info" />
+      <div className="h-screen w-full flex items-center justify-center bg-surface">
+        <Spinner size="xl" className="fill-brand-500" />
         <p className="ml-3 text-white">Loading user profile...</p>
       </div>
     );
@@ -691,9 +681,9 @@ const Profile = () => {
   const isEmailVerified = user.emailVerified === true;
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center py-6 px-4 bg-gray-900 relative">
+    <div className="min-h-screen w-full flex flex-col items-center py-6 px-4 bg-surface relative">
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0">
-        <div className="absolute top-10 -left-40 w-96 h-96 bg-blue-700 opacity-20 rounded-full filter blur-3xl" />
+        <div className="absolute top-10 -left-40 w-96 h-96 bg-brand-600 opacity-20 rounded-full filter blur-3xl" />
         <div className="absolute bottom-10 -right-40 w-96 h-96 bg-purple-600 opacity-20 rounded-full filter blur-3xl" />
       </div>
       
@@ -705,7 +695,7 @@ const Profile = () => {
           onDismiss={dismissToast} 
         />
         
-        <Card className="shadow-lg border-0 bg-gray-800 bg-opacity-70 backdrop-blur-sm">
+        <Card className="shadow-lg border-0 bg-elevated/70 backdrop-blur-sm">
           <div className="flex flex-col items-center mb-6 relative">
             <ProfileAvatar
               photoURL={formState.photoURL}
@@ -738,7 +728,7 @@ const Profile = () => {
                 <Label htmlFor="firstName" value="First Name" className="text-xs font-medium text-gray-300" />
                 <InputField 
                   id="firstName" 
-                  icon={HiUser} 
+                  icon={User} 
                   value={formState.firstName} 
                   onChange={handleInputChange} 
                   disabled={!isEditing}
@@ -749,7 +739,7 @@ const Profile = () => {
                 <Label htmlFor="lastName" value="Last Name" className="text-xs font-medium text-gray-300" />
                 <InputField 
                   id="lastName" 
-                  icon={HiUser} 
+                  icon={User} 
                   value={formState.lastName} 
                   onChange={handleInputChange} 
                   disabled={!isEditing} 

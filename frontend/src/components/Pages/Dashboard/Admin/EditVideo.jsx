@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Card, TextInput, Textarea, Select, Button, Spinner, Alert } from 'flowbite-react';
 import { Save, ArrowLeft, Trash } from 'lucide-react';
 import VideoService from '../../../../utils/VideoService';
+import getPlaceholderImage from '../../../../utils/getPlaceholderImage';
 import { AuthContext } from '../../../../contexts/AuthProvider/AuthProvider';
 
 const EditVideo = () => {
@@ -199,10 +200,10 @@ const EditVideo = () => {
         </Alert>
       )}
       
-      <Card className="bg-gray-800 border-gray-700 mb-6">
+      <Card className="bg-elevated border-elevated-border mb-6">
         <div className="flex items-center space-x-4 mb-6">
           <img 
-            src={video.thumbnail_url || '/api/placeholder/300/169'} 
+            src={video.thumbnail_url || getPlaceholderImage(300, 169, video.title)} 
             alt={video.title}
             className="w-32 h-18 object-cover rounded"
           />
@@ -299,14 +300,13 @@ const EditVideo = () => {
             </p>
           </div>
              
-          <div className="flex justify-between pt-4 border-t border-gray-700">
+          <div className="flex justify-between pt-4 border-t border-elevated-border">
             <Button
               color="failure"
               outline
               onClick={() => navigate(`/video/${id}`)}
               type="button"
             >
-              <Trash className="mr-2 h-5 w-5" />
               Delete Video
             </Button>
             
@@ -321,10 +321,7 @@ const EditVideo = () => {
                   Saving...
                 </>
               ) : (
-                <>
-                  <Save className="mr-2 h-5 w-5" />
-                  Save Changes
-                </>
+                <>Save Changes</>
               )}
             </Button>
           </div>

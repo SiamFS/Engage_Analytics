@@ -1,4 +1,4 @@
-import React, { useState, useContext, useId, useEffect } from 'react';
+import React, { useState, useContext, useId, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { AuthContext } from '../../../contexts/AuthProvider/AuthProvider';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -6,16 +6,17 @@ import BrandLogo from '../Brandlogo/brandlogo';
 import { FormInput, SubmitButton } from '../Authcommon/FormElements';
 import PropTypes from 'prop-types';
 
-/**
- * Error message component with animation
- */
+const COOLDOWN_SECONDS = 60;
+const STORAGE_KEY = 'ea_reset_cooldown';
+const MAX_EMAIL_LENGTH = 254;
+
 const ErrorMessage = ({ error }) => (
   <motion.div
     initial={{ opacity: 0, y: -15 }}
     animate={{ opacity: 1, y: 0 }}
     exit={{ opacity: 0, y: -15 }}
     transition={{ duration: 0.3 }}
-    className="p-3 rounded-[12px] sm:rounded-[14px] bg-red-800/30 border border-red-700"
+    className="p-3 rounded-lg bg-red-800/30 border border-red-700"
   >
     <p className="text-red-400 text-xs sm:text-sm">{error}</p>
   </motion.div>
@@ -25,16 +26,13 @@ ErrorMessage.propTypes = {
   error: PropTypes.string.isRequired
 };
 
-/**
- * Success message component with animation
- */
 const SuccessMessage = ({ message }) => (
   <motion.div
     initial={{ opacity: 0, y: -15 }}
     animate={{ opacity: 1, y: 0 }}
     exit={{ opacity: 0, y: -15 }}
     transition={{ duration: 0.3 }}
-    className="p-3 rounded-[12px] sm:rounded-[14px] bg-green-800/30 border border-green-700"
+    className="p-3 rounded-lg bg-green-800/30 border border-green-700"
   >
     <p className="text-green-400 text-xs sm:text-sm">{message}</p>
   </motion.div>
@@ -51,6 +49,7 @@ const ForgetPassword = () => {
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  const cooldownTimerRef = useRef(null);
 
   const emailId = useId();
 
@@ -66,50 +65,40 @@ const ForgetPassword = () => {
   };
 
   useEffect(() => {
-    const loadCooldown = () => {
-      try {
-        const cooldownData = document.cookie
-          .split('; ')
-          .find(row => row.startsWith('resetCooldown='));
-        
-        if (cooldownData) {
-          const [email, expiry] = cooldownData.split('=')[1].split(':');
-          const timeLeft = Math.ceil((parseInt(expiry) - Date.now()) / 1000);
-          
-          if (timeLeft > 0) {
-            setEmail(decodeURIComponent(email));
-            setCooldown(timeLeft);
-            startCooldownTimer(timeLeft);
-          } else {
-      
-            document.cookie = 'resetCooldown=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-          }
+    try {
+      const stored = sessionStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const expiry = parseInt(stored, 10);
+        const timeLeft = Math.ceil((expiry - Date.now()) / 1000);
+        if (timeLeft > 0) {
+          setCooldown(timeLeft);
+          startCooldownTimer(timeLeft);
+        } else {
+          sessionStorage.removeItem(STORAGE_KEY);
         }
-      } catch (error) {
-        console.error('Error loading cooldown:', error);
-        document.cookie = 'resetCooldown=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
       }
-    };
+    } catch (e) {
+      console.error('Error loading cooldown:', e);
+    }
 
-    loadCooldown();
+    return () => {
+      if (cooldownTimerRef.current) clearInterval(cooldownTimerRef.current);
+    };
   }, []);
 
   const startCooldownTimer = (duration) => {
-    const timer = setInterval(() => {
-      setCooldown((prevCooldown) => {
-        if (prevCooldown <= 1) {
-          clearInterval(timer);
-          document.cookie = 'resetCooldown=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+    if (cooldownTimerRef.current) clearInterval(cooldownTimerRef.current);
+    cooldownTimerRef.current = setInterval(() => {
+      setCooldown((prev) => {
+        if (prev <= 1) {
+          clearInterval(cooldownTimerRef.current);
+          cooldownTimerRef.current = null;
+          sessionStorage.removeItem(STORAGE_KEY);
           return 0;
         }
-        return prevCooldown - 1;
+        return prev - 1;
       });
     }, 1000);
-  };
-
-  const setCooldownCookie = (email, durationSeconds) => {
-    const expires = Date.now() + (durationSeconds * 1000);
-    document.cookie = `resetCooldown=${encodeURIComponent(email)}:${expires}; path=/; max-age=${durationSeconds}`;
   };
 
   const handlePasswordReset = async (e) => {
@@ -122,28 +111,37 @@ const ForgetPassword = () => {
       return;
     }
 
-    if (!email) {
+    const trimmedEmail = email.trim();
+
+    if (!trimmedEmail) {
       setError('Please enter your email address');
       return;
     }
 
-    // Validate email format
+    if (trimmedEmail.length > MAX_EMAIL_LENGTH) {
+      setError('Email address is too long');
+      return;
+    }
+
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-    if (!emailRegex.test(email)) {
+    if (!emailRegex.test(trimmedEmail)) {
       setError('Please enter a valid email address');
       return;
     }
 
     setLoading(true);
     try {
-      await resetPassword(email);
+      await resetPassword(trimmedEmail);
       setSuccess(true);
-      
-      const cooldownDuration = 60;
-      setCooldown(cooldownDuration);
-      setCooldownCookie(email, cooldownDuration);
-      startCooldownTimer(cooldownDuration);
 
+      const expires = Date.now() + COOLDOWN_SECONDS * 1000;
+      try {
+        sessionStorage.setItem(STORAGE_KEY, String(expires));
+      } catch (e) {
+        /* storage full */
+      }
+      setCooldown(COOLDOWN_SECONDS);
+      startCooldownTimer(COOLDOWN_SECONDS);
     } catch (error) {
       if (error.code === 'auth/user-not-found') {
         setSuccess(true);
@@ -162,14 +160,14 @@ const ForgetPassword = () => {
   
   return (
     <motion.div 
-      className="min-h-screen flex flex-col justify-center items-center px-3 sm:px-4 md:px-6 py-6 sm:py-8 md:py-12 bg-gray-900 overflow-auto"
+      className="min-h-screen flex flex-col justify-center items-center px-3 sm:px-4 md:px-6 py-6 sm:py-8 md:py-12 bg-surface overflow-auto"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
     >
       <motion.div 
-        className="fixed top-0 -left-32 w-64 sm:w-96 h-64 sm:h-96 bg-blue-600 opacity-15 rounded-full filter blur-[40px] sm:blur-[64px] pointer-events-none"
+        className="fixed top-0 -left-32 w-64 sm:w-96 h-64 sm:h-96 bg-brand-600 opacity-15 rounded-full filter blur-[40px] sm:blur-[64px] pointer-events-none"
         variants={backgroundVariants}
         initial="initial"
         animate="animate"
@@ -182,12 +180,11 @@ const ForgetPassword = () => {
       />
       
       <div className="w-full max-w-md mx-auto relative z-10">
- 
         <div className="flex justify-center mb-6 sm:mb-8">
           <BrandLogo className="w-auto h-10 sm:h-12" />
         </div>
   
-        <div className="relative bg-gray-800/80 backdrop-blur-md rounded-[16px] sm:rounded-[20px] md:rounded-[28px] border border-gray-700 shadow-2xl ring-1 ring-blue-900/30 p-4 sm:p-6 md:p-8 space-y-4 sm:space-y-5 max-h-[85vh] overflow-y-auto">
+        <div className="relative bg-elevated backdrop-blur-md rounded-[16px] sm:rounded-[20px] md:rounded-[28px] border border-elevated-border shadow-2xl ring-1 ring-brand-900/30 p-4 sm:p-6 md:p-8 space-y-4 sm:space-y-5 max-h-[85vh] overflow-y-auto">
           <h2 className="text-xl sm:text-2xl md:text-3xl font-semibold text-center text-white mb-2 sm:mb-3 sticky top-0 py-2 z-10">
             Reset Password
           </h2>
@@ -198,14 +195,8 @@ const ForgetPassword = () => {
               label="Email"
               type="email"
               value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                if (cooldown > 0 && e.target.value !== email) {
-                  // Reset cooldown if email changes
-                  setCooldown(0);
-                  document.cookie = 'resetCooldown=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-                }
-              }}
+              onChange={(e) => setEmail(e.target.value)}
+              maxLength={MAX_EMAIL_LENGTH}
               required
               placeholder="Enter your email address"
               autoComplete="email"
@@ -228,11 +219,10 @@ const ForgetPassword = () => {
             />
           </form>
 
-          {/* Back to login link */}
-          <p className="mt-4 sm:mt-5 md:mt-6 text-center text-xs sm:text-sm text-gray-400 sticky bottom-0 py-2 ">
+          <p className="mt-4 sm:mt-5 md:mt-6 text-center text-xs sm:text-sm text-gray-400 sticky bottom-0 py-2">
             <Link
               to="/login"
-              className="font-medium text-blue-400 hover:text-blue-300 focus:outline-none focus:underline inline-flex items-center"
+              className="font-medium text-brand-400 hover:text-brand-300 focus:outline-none focus:underline inline-flex items-center"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />

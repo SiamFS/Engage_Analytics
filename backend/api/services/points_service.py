@@ -1,6 +1,7 @@
 import logging
 from django.db import transaction
 from api.models import ViewerProfile
+from api.services.notification_service import NotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -14,4 +15,28 @@ class PointsService:
             profile.points += points
             profile.points_earned += points
             profile.save(update_fields=["points", "points_earned"])
+        NotificationService.create_notification(
+            recipient=user,
+            notification_type="points_earned",
+            title=f"You earned {points} points!",
+            message=f"You received {points} points for completing a webcam recording upload.",
+            data={"points": points, "reason": "webcam_upload"},
+        )
+        return profile, points
+
+    @staticmethod
+    def award_points_for_video_upload(user, points=10):
+        """Awards points to a user for successfully uploading a video."""
+        with transaction.atomic():
+            profile, _ = ViewerProfile.objects.get_or_create(user=user)
+            profile.points += points
+            profile.points_earned += points
+            profile.save(update_fields=["points", "points_earned"])
+        NotificationService.create_notification(
+            recipient=user,
+            notification_type="points_earned",
+            title=f"You earned {points} points!",
+            message=f"You received {points} points for uploading a video.",
+            data={"points": points, "reason": "video_upload"},
+        )
         return profile, points

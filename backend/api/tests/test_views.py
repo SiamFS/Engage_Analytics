@@ -509,16 +509,14 @@ class TestCreateVideoShareAPI:
 
     @patch('api.views.VideoShareService.create_share')
     def test_create_share_service_returns_none(self, mock_create_share, authenticated_client, test_video):
-        """Test when the service returns None (e.g., authentication issue)."""
-        # Mock the service to return None
+        """Test when the service returns None (e.g., video is private)."""
         mock_create_share.return_value = None
         
         url = reverse('create-video-share', kwargs={'video_id': test_video.id})
         response = authenticated_client.post(url)
         
-        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        assert response.status_code == status.HTTP_403_FORBIDDEN
         assert 'error' in response.data
-        assert response.data['error'] == 'Authentication required'
         
         # Verify the service was called
         mock_create_share.assert_called_once_with(test_video.id, authenticated_client.handler._force_user)

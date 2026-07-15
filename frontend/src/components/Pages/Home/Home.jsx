@@ -6,9 +6,9 @@ const NotLoggedInView = lazy(() => import('../../Shared/NotLoggedInView/NotLogge
 const LoggedInView = lazy(() => import('../../Shared/LoggedInView/LoggedInView'));
 
 const FullPageLoader = () => (
-  <div className="flex items-center justify-center min-h-screen bg-gray-900">
+  <div className="flex items-center justify-center min-h-screen bg-surface">
     <div className="flex flex-col items-center">
-      <Spinner size="xl" color="info" />
+      <Spinner size="xl" className="fill-brand-500" />
       <p className="mt-4 text-gray-300">Loading...</p>
     </div>
   </div>
@@ -21,7 +21,7 @@ const Home = () => {
     return <FullPageLoader />;
   }
   return (
-    <div className="bg-gray-900 min-h-screen">
+    <div className="bg-surface min-h-screen">
       <Suspense fallback={<FullPageLoader />}>
         {user ? <LoggedInView /> : <NotLoggedInView />}
       </Suspense>

@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 from django.conf import settings
 from django.utils import timezone
 from azure.storage.blob import generate_blob_sas, BlobSasPermissions
@@ -196,3 +197,53 @@ class AzureStorageService:
             return None
 
         return client.download_blob().readall()
+
+    @classmethod
+    def download_blob_to_tempfile(cls, blob_url: str) -> Optional[str]:
+        """Stream blob content directly to a temp file (avoids loading entire blob into memory).
+
+        Returns the temp file path, or None on failure. Caller must clean up the file.
+        """
+        import os
+        import tempfile
+
+        from urllib.parse import urlparse
+        from azure.storage.blob import BlobClient
+
+        if not blob_url:
+            return None
+
+        parsed = urlparse(blob_url)
+        parts = [p for p in parsed.path.lstrip("/").split("/") if p]
+        if len(parts) < 2:
+            return None
+
+        container_name = parts[0]
+        blob_name = "/".join(parts[1:])
+
+        creds = cls.get_storage_credentials()
+        if not creds["account_key"]:
+            return None
+
+        client = BlobClient(
+            account_url=f"https://{creds['account_name']}.blob.core.windows.net",
+            container_name=container_name,
+            blob_name=blob_name,
+            credential=creds["account_key"],
+        )
+
+        tmp = tempfile.NamedTemporaryFile(suffix=".webm", delete=False)
+        try:
+            stream = client.download_blob().chunks()
+            for chunk in stream:
+                tmp.write(chunk)
+            tmp.flush()
+            tmp.close()
+            return tmp.name
+        except Exception as exc:
+            logger.error(f"Failed to stream blob to temp file: {exc}", exc_info=True)
+            try:
+                os.unlink(tmp.name)
+            except OSError:
+                pass
+            return None

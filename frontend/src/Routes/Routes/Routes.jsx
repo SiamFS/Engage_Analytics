@@ -12,6 +12,8 @@ import UploadVideo from "../../components/Pages/Dashboard/Admin/UploadVideo.jsx"
 import VideoDetail from "../../components/Shared/VideoPlayer/VideoDetail.jsx";
 import PrivateRoute from "../PrivateRoute/Privateroute.jsx";
 import AdminRoute from "../AdminRoute/AdminRoute.jsx";
+import CompanyOrAdminRoute from "../CompanyOrAdminRoute/CompanyOrAdminRoute.jsx";
+import UserRoute from "../UserRoute/UserRoute.jsx";
 import Video from "../../components/Pages/Video/Video.jsx";
 import DeviceManager from "../../components/Shared/DeviceManager/DeviceManager.jsx";
 import UserWatchHistory from "../../components/Pages/Dashboard/User/UserWatchHistory.jsx";
@@ -21,6 +23,17 @@ import AdminRoleManagement from "../../components/Pages/Dashboard/Admin/AdminRol
 import UserLikedVideo from "../../components/Pages/Dashboard/User/UserLikedVideo.jsx";
 import RecordedVideos from "../../components/Pages/Dashboard/Admin/RecordedVideos.jsx";
 import DetailedAnalytics from "../../components/Pages/Dashboard/Admin/DetailedAnalytics.jsx";
+import PointsManagement from "../../components/Pages/Dashboard/Admin/PointsManagement.jsx";
+import AdminSurveyManagement from "../../components/Pages/Dashboard/Admin/AdminSurveyManagement.jsx";
+import UserFeedbackHistory from "../../components/Pages/Dashboard/User/UserFeedbackHistory.jsx";
+import NotificationCenter from "../../components/Pages/Dashboard/NotificationCenter.jsx";
+import NotificationSettings from "../../components/Pages/Dashboard/NotificationSettings.jsx";
+import CompanyUploadRequests from "../../components/Pages/Dashboard/Company/UploadRequests.jsx";
+import NewUploadRequest from "../../components/Pages/Dashboard/Company/NewUploadRequest.jsx";
+import UploadRequestDetail from "../../components/Pages/Dashboard/Company/UploadRequestDetail.jsx";
+import CompanyAnalytics from "../../components/Pages/Dashboard/Company/CompanyAnalytics.jsx";
+import AdminUploadRequestManagement from "../../components/Pages/Dashboard/Admin/AdminUploadRequests.jsx";
+import UserManagement from "../../components/Pages/Dashboard/Admin/UserManagement.jsx";
 import { Navigate } from "react-router-dom";
 
 
@@ -71,7 +84,7 @@ const router = createBrowserRouter([
       },
       {
         path: "/video/:id", 
-        element: <PrivateRoute><VideoDetail /></PrivateRoute>,
+        element: <VideoDetail />,
       },
       {
         path: "/videos",
@@ -92,7 +105,7 @@ const router = createBrowserRouter([
   
       {
         path: "upload",
-        element: <AdminRoute><UploadVideo /></AdminRoute>
+        element: <CompanyOrAdminRoute><UploadVideo /></CompanyOrAdminRoute>
       },
       {
         path: "videos",
@@ -111,6 +124,54 @@ const router = createBrowserRouter([
         element: <AdminRoute><RecordedVideos /></AdminRoute>
       },
       {
+        path: "points",
+        element: <AdminRoute><PointsManagement /></AdminRoute>
+      },
+      {
+        path: "survey",
+        element: <AdminRoute><AdminSurveyManagement /></AdminRoute>
+      },
+      {
+        path: "feedback",
+        element: <Navigate to="/dashboard/survey" replace />
+      },
+      {
+        path: "feedback/analytics",
+        element: <Navigate to="/dashboard/survey" replace />
+      },
+      {
+        path: "feedback/survey",
+        element: <Navigate to="/dashboard/survey" replace />
+      },
+      {
+        path: "my-feedback",
+        element: <UserRoute><UserFeedbackHistory /></UserRoute>
+      },
+      {
+        path: "upload-requests",
+        element: <CompanyOrAdminRoute><CompanyUploadRequests /></CompanyOrAdminRoute>
+      },
+      {
+        path: "upload-requests/new",
+        element: <CompanyOrAdminRoute><NewUploadRequest /></CompanyOrAdminRoute>
+      },
+      {
+        path: "upload-requests/:id",
+        element: <CompanyOrAdminRoute><UploadRequestDetail /></CompanyOrAdminRoute>
+      },
+      {
+        path: "company-analytics",
+        element: <CompanyOrAdminRoute><CompanyAnalytics /></CompanyOrAdminRoute>
+      },
+      {
+        path: "admin-upload-requests",
+        element: <AdminRoute><AdminUploadRequestManagement /></AdminRoute>
+      },
+      {
+        path: "company-management",
+        element: <AdminRoute><UserManagement /></AdminRoute>
+      },
+      {
         path: "detailed-analytics",
         element: <PrivateRoute><DetailedAnalytics /></PrivateRoute>
       },
@@ -120,12 +181,24 @@ const router = createBrowserRouter([
       },
       {
         path: "liked-videos",
-        element: <PrivateRoute><UserLikedVideo /></PrivateRoute>,
+        element: <UserRoute><UserLikedVideo /></UserRoute>,
       },
       {
         path: "history",
-        element: <PrivateRoute><UserWatchHistory /></PrivateRoute>,
-      }
+        element: <UserRoute><UserWatchHistory /></UserRoute>,
+      },
+      {
+        path: "notifications",
+        element: <PrivateRoute><NotificationCenter /></PrivateRoute>,
+      },
+      {
+        path: "notification-settings",
+        element: <PrivateRoute><NotificationSettings /></PrivateRoute>,
+      },
+      {
+        path: "*",
+        element: <Navigate to="/dashboard" replace />
+      },
     ]
   }
 ]);

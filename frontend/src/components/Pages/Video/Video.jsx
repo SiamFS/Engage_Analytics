@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback, lazy, Suspense, useRef } from 'react';
+﻿import React, { useState, useEffect, useCallback, lazy, Suspense, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button, Spinner } from 'flowbite-react';
-import { Grid, List, TrendingUp, ThumbsUp, Clock, ChevronDown, Filter } from 'lucide-react';
+import { Grid, List, ThumbsUp, Clock, ChevronDown, Filter, Eye, User } from 'lucide-react';
 import PropTypes from 'prop-types';
 import VideoDataService from '../../../utils/VideoDataService';
 import { 
@@ -9,38 +9,90 @@ import {
   ErrorState, 
   EmptyState 
 } from '../../Shared/VideoLoadingStates/VideoLoadingStates';
-import VideoService from '../../../utils/VideoService';
+import getPlaceholderImage from '../../../utils/getPlaceholderImage';
+import SkeletonCard from '../../Shared/SkeletonCard/SkeletonCard';
 
 const AdCard = lazy(() => import('../../Shared/AdCard/AdCard'));
 
 const VIDEOS_PER_PAGE = 12;
 
-const AdCardPlaceholder = () => (
-  <div className="bg-gray-800 rounded-lg overflow-hidden shadow-lg animate-pulse">
-    <div className="aspect-video bg-gray-700"></div>
-    <div className="p-3">
-      <div className="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
-      <div className="h-3 bg-gray-700 rounded w-1/2"></div>
-    </div>
-  </div>
-);
+const AdCardPlaceholder = () => <SkeletonCard rounded="rounded-xl" />
 
-const VideoListItem = ({ video }) => (
-  <div className="flex flex-col sm:flex-row">
-    <div className="w-full sm:w-64 h-40 overflow-hidden">
-      <img 
-        src={video.thumbnail_url || '/api/placeholder/400/225'} 
-        alt={video.title}
-        className="w-full h-full object-cover transition-transform duration-300 hover:scale-110"
-        loading="lazy"
-      />
+const formatRelativeTime = (dateString) => {
+  if (!dateString) return '';
+  try {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffSecs = Math.floor(diffMs / 1000);
+    const diffMins = Math.floor(diffSecs / 60);
+    const diffHrs = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHrs / 24);
+    if (diffSecs < 60) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHrs < 24) return `${diffHrs}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  } catch {
+    return '';
+  }
+};
+
+const VideoListItem = ({ video, onClick }) => (
+  <button
+    onClick={(e) => onClick(video, e)}
+    className="w-full text-left bg-elevated hover:bg-surface-600 rounded-xl overflow-hidden border border-elevated-border hover:border-white/10 transition-all duration-300 group p-0"
+    aria-label={`Watch video: ${video.title}`}
+    type="button"
+  >
+    <div className="flex flex-col sm:flex-row">
+      <div className="relative w-full sm:w-56 h-40 sm:h-32 shrink-0 overflow-hidden">
+        <img 
+          src={video.thumbnail_url || getPlaceholderImage(400, 225, video.title)} 
+          alt={video.title}
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          loading="lazy"
+          onError={(e) => {
+            e.target.onerror = null;
+            if (!e.target.src.includes('placeholder')) {
+              e.target.src = getPlaceholderImage(400, 225, video.title);
+            }
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-surface/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      </div>
+      <div className="p-4 flex-1 min-w-0">
+        <h3 className="text-white font-semibold text-base mb-1 line-clamp-1 group-hover:text-brand-400 transition-colors">
+          {video.title}
+        </h3>
+        {video.uploader_name && (
+          <div className="flex items-center gap-1.5 mb-2">
+            <div className="w-4 h-4 rounded-full bg-surface-600 flex items-center justify-center shrink-0">
+              <User size={9} className="text-gray-300" />
+            </div>
+            <span className="text-xs text-gray-400 truncate">{video.uploader_name}</span>
+          </div>
+        )}
+        <p className="text-gray-500 text-sm mb-2 line-clamp-2 leading-relaxed">
+          {video.description || 'No description'}
+        </p>
+        <div className="flex items-center text-gray-500 text-xs gap-3">
+          <span className="flex items-center gap-1">
+            <Eye size={12} />
+            {video.views != null ? video.views.toLocaleString() : '0'}
+          </span>
+          <span className="flex items-center gap-1">
+            <ThumbsUp size={12} />
+            {video.likes != null ? video.likes.toLocaleString() : '0'}
+          </span>
+          <span className="flex items-center gap-1">
+            <Clock size={12} />
+            {formatRelativeTime(video.upload_date)}
+          </span>
+        </div>
+      </div>
     </div>
-    <div className="p-6 flex-1">
-      <h3 className="text-white font-semibold text-xl mb-2 line-clamp-1">{video.title}</h3>
-      <p className="text-gray-400 text-sm mb-3 line-clamp-2">{video.description}</p>
-      <VideoMetrics video={video} />
-    </div>
-  </div>
+  </button>
 );
 
 VideoListItem.propTypes = {
@@ -48,39 +100,13 @@ VideoListItem.propTypes = {
     id: PropTypes.oneOfType([PropTypes.number, PropTypes.string]).isRequired,
     title: PropTypes.string,
     description: PropTypes.string,
-    thumbnail_url: PropTypes.string
-  }).isRequired
-};
-
-const VideoMetrics = ({ video }) => (
-  <>
-    <div className="flex items-center text-gray-500 text-sm gap-4">
-      <span className="flex items-center">
-        <ThumbsUp size={16} className="mr-1" /> 
-        {video.likes || 0}
-      </span>
-      <span className="flex items-center">
-        <TrendingUp size={16} className="mr-1" /> 
-        {video.views || 0} views
-      </span>
-      <span className="flex items-center">
-        <Clock size={16} className="mr-1" />
-        {VideoService.formatRelativeTime(video.upload_date)}
-      </span>
-    </div>
-    <div className="mt-3 text-sm text-blue-400">
-      {video.uploader_name}
-    </div>
-  </>
-);
-
-VideoMetrics.propTypes = {
-  video: PropTypes.shape({
-    likes: PropTypes.number,
+    thumbnail_url: PropTypes.string,
     views: PropTypes.number,
+    likes: PropTypes.number,
     upload_date: PropTypes.string,
     uploader_name: PropTypes.string
-  }).isRequired
+  }).isRequired,
+  onClick: PropTypes.func.isRequired
 };
 
 const Video = () => {
@@ -243,18 +269,13 @@ const Video = () => {
     setLoadingMore(true);
     
     const nextPage = page + 1;
-    const startIndex = 0;
     const endIndex = nextPage * VIDEOS_PER_PAGE;
     
-    const newDisplayedVideos = filteredVideos.slice(startIndex, endIndex);
+    const newDisplayedVideos = filteredVideos.slice(0, endIndex);
     setDisplayedVideos(newDisplayedVideos);
     setPage(nextPage);
     setHasMore(endIndex < filteredVideos.length);
     setLoadingMore(false);
-  };
-  
-  const toggleViewMode = () => {
-    setViewMode(prev => prev === 'grid' ? 'list' : 'grid');
   };
   
   const handleSortChange = (option) => {
@@ -304,75 +325,78 @@ const Video = () => {
   }
   
   return (
-    <div className="bg-gray-900 min-h-screen py-6 px-4 md:px-8 w-full">
+    <div className="bg-surface min-h-screen py-6 px-4 md:px-8 w-full">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between mb-6 gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-white mb-1">
-              {searchQuery ? `Search results for "${searchQuery}"` : 'Videos'}
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold text-white mb-1 truncate">
+              {searchQuery ? `Results for "${searchQuery}"` : 'Videos'}
             </h1>
             {(categoryFilter || typeFilter) && (
               <div className="flex flex-wrap gap-2 mt-2">
                 {categoryFilter && (
-                  <div className="bg-purple-900/40 text-purple-300 rounded-full px-3 py-1 text-sm">
-                    Category: {categoryFilter}
-                  </div>
+                  <span className="inline-flex items-center gap-1 bg-brand-900/40 text-brand-300 rounded-full px-3 py-1 text-xs font-medium">
+                    <Filter size={11} />
+                    {categoryFilter}
+                  </span>
                 )}
                 
                 {typeFilter && (
-                  <div className="bg-green-900/40 text-green-300 rounded-full px-3 py-1 text-sm capitalize">
+                  <span className="inline-flex items-center gap-1 bg-purple-900/40 text-purple-300 rounded-full px-3 py-1 text-xs font-medium capitalize">
                     {typeFilter === 'foryou' ? 'For You' : typeFilter}
-                  </div>
+                  </span>
                 )}
                 
                 <button
                   onClick={handleClearFilters}
-                  className="text-gray-400 hover:text-white text-sm underline ml-1"
+                  className="text-gray-500 hover:text-white text-xs underline underline-offset-2 transition-colors ml-1"
                 >
-                  Clear filters
+                  Clear all
                 </button>
               </div>
             )}
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 shrink-0">
             <Button
               color="gray"
               size="sm"
               onClick={() => setShowFilters(!showFilters)}
-              className="bg-gray-800 hover:bg-gray-700 text-white"
+              className={`bg-elevated hover:bg-surface-600 text-white border border-elevated-border focus:ring-0 ${showFilters ? 'ring-1 ring-brand-500' : ''}`}
             >
-              <Filter size={16} className="mr-1" />
+              <Filter size={15} className="mr-1.5" />
               Filters
-              <ChevronDown size={16} className={`ml-1 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+              <ChevronDown size={15} className={`ml-1.5 transition-transform duration-200 ${showFilters ? 'rotate-180' : ''}`} />
             </Button>
             
-            <Button
-              color="gray"
-              size="sm"
-              onClick={toggleViewMode}
-              className="hidden md:flex bg-gray-800 border-gray-700 text-white items-center"
-            >
-              {viewMode === 'grid' ? (
-                <>
-                  <Grid size={16} className="text-blue-400 mr-1" />
-                  <List size={16} />
-                </>
-              ) : (
-                <>
-                  <Grid size={16} className="mr-1" />
-                  <List size={16} className="text-blue-400" />
-                </>
-              )}
-            </Button>
+            <div className="h-6 w-px bg-elevated-border mx-1 hidden md:block" />
+
+            <div className="hidden md:flex bg-elevated rounded-lg border border-elevated-border p-0.5">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-1.5 rounded-md transition-all duration-200 ${viewMode === 'grid' ? 'bg-brand-600 text-white shadow-sm' : 'text-gray-400 hover:text-white'}`}
+                aria-label="Grid view"
+                type="button"
+              >
+                <Grid size={16} />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-1.5 rounded-md transition-all duration-200 ${viewMode === 'list' ? 'bg-brand-600 text-white shadow-sm' : 'text-gray-400 hover:text-white'}`}
+                aria-label="List view"
+                type="button"
+              >
+                <List size={16} />
+              </button>
+            </div>
           </div>
         </div>
         
         {showFilters && (
-          <div className="bg-gray-800 rounded-lg p-4 mb-6 border border-gray-700">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-elevated backdrop-blur-sm rounded-xl p-5 mb-6 border border-elevated-border shadow-lg animate-fade-in">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <h3 className="text-white font-medium mb-2">Sort By</h3>
+                <h3 className="text-sm font-semibold text-white mb-3 uppercase tracking-wider">Sort By</h3>
                 <div className="flex flex-wrap gap-2">
                   {[
                     { id: 'newest', label: 'Newest' },
@@ -380,33 +404,39 @@ const Video = () => {
                     { id: 'popular', label: 'Most Viewed' },
                     { id: 'liked', label: 'Most Liked' }
                   ].map(option => (
-                    <Button
+                    <button
                       key={option.id}
-                      color={sortOption === option.id ? "blue" : "gray"}
-                      size="xs"
                       onClick={() => handleSortChange(option.id)}
-                      className={sortOption === option.id ? "bg-blue-600" : "bg-gray-700 hover:bg-gray-600"}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                        sortOption === option.id
+                          ? 'bg-brand-600 text-white shadow-sm'
+                          : 'bg-surface-600 text-gray-300 hover:bg-surface-500 hover:text-white'
+                      }`}
+                      type="button"
                     >
                       {option.label}
-                    </Button>
+                    </button>
                   ))}
                 </div>
               </div>
               
               {categories.length > 0 && (
                 <div>
-                  <h3 className="text-white font-medium mb-2">Categories</h3>
+                  <h3 className="text-sm font-semibold text-white mb-3 uppercase tracking-wider">Categories</h3>
                   <div className="flex flex-wrap gap-2">
                     {categories.map(category => (
-                      <Button
+                      <button
                         key={category}
-                        color={categoryFilter === category ? "blue" : "gray"}
-                        size="xs"
                         onClick={() => handleCategoryChange(category)}
-                        className={categoryFilter === category ? "bg-blue-600" : "bg-gray-700 hover:bg-gray-600"}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                          categoryFilter === category
+                            ? 'bg-brand-600 text-white shadow-sm'
+                            : 'bg-surface-600 text-gray-300 hover:bg-surface-500 hover:text-white'
+                        }`}
+                        type="button"
                       >
                         {category}
-                      </Button>
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -415,7 +445,7 @@ const Video = () => {
           </div>
         )}
         
-        <p className="text-gray-400 mb-6">
+        <p className="text-gray-500 text-sm mb-6">
           {filteredVideos.length} {filteredVideos.length === 1 ? 'video' : 'videos'} found
         </p>
         
@@ -431,7 +461,7 @@ const Video = () => {
             <div className={
               viewMode === 'grid'
                 ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"
-                : "flex flex-col space-y-6"
+                : "flex flex-col space-y-4"
             }>
               {Array.from({ length: 8 }, (_, i) => `ph-${i}`).map((key) => (
                 <AdCardPlaceholder key={key} />
@@ -441,7 +471,7 @@ const Video = () => {
             <div className={
               viewMode === 'grid' 
                 ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6" 
-                : "flex flex-col space-y-6"
+                : "flex flex-col space-y-4"
             }>
               {displayedVideos.map((video, index) => {
                 const isLastElement = index === displayedVideos.length - 1;
@@ -453,26 +483,20 @@ const Video = () => {
                       ref={isLastElement ? lastVideoElementRef : null}
                       onClick={(e) => handleVideoInteraction(video, e)}
                       onKeyDown={(e) => handleVideoInteraction(video, e)}
-                      className="block w-full text-left bg-transparent border-none p-0"
+                      className="block w-full text-left bg-transparent border-none p-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded-xl"
                       aria-label={`Watch video: ${video.title}`}
                     >
-                      <div className="transform transition-transform duration-200 hover:scale-105">
-                        <AdCard ad={video} />
-                      </div>
+                      <AdCard ad={video} />
                     </button>
                   );
                 } else {
                   return (
-                    <button
+                    <div
                       key={video.id}
                       ref={isLastElement ? lastVideoElementRef : null}
-                      onClick={(e) => handleVideoInteraction(video, e)}
-                      onKeyDown={(e) => handleVideoInteraction(video, e)}
-                      className="block w-full text-left bg-gray-800 rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-700 hover:bg-gray-700/60 p-0"
-                      aria-label={`Watch video: ${video.title}`}
                     >
-                      <VideoListItem video={video} />
-                    </button>
+                      <VideoListItem video={video} onClick={handleVideoInteraction} />
+                    </div>
                   );
                 }
               })}
@@ -481,17 +505,17 @@ const Video = () => {
         )}
         
         {loadingMore && (
-          <div className="flex justify-center mt-8">
-            <Spinner size="xl" />
+          <div className="flex justify-center mt-10">
+            <Spinner size="xl" className="fill-brand-500" />
           </div>
         )}
         
         {hasMore && !loadingMore && (
-          <div className="flex justify-center mt-8">
+          <div className="flex justify-center mt-10">
             <Button 
               color="blue" 
               onClick={loadMoreVideos}
-              className="px-8"
+              className="px-8 bg-brand-600 hover:bg-brand-700 focus:ring-0"
             >
               Load More
             </Button>

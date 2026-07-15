@@ -28,6 +28,7 @@ from api.models import (
     VideoEmotionSummary,
     AnalysisRunLog,
     EMOTION_CLASSES,
+    UploadRequest,
 )
 from api.serializers import (
     FilenameSerializer,
@@ -42,6 +43,9 @@ from api.serializers import (
     VideoEmotionSummarySerializer,
     AnalysisRunLogSerializer,
     WebcamRecordingSerializer,
+    UploadRequestListSerializer,
+    UploadRequestDetailSerializer,
+    UploadRequestCreateSerializer,
 )
 from api.services import (
     PointsService,
@@ -55,6 +59,7 @@ from api.services import (
 from api.utils import safe_int_param
 from api.permissions import IsAdmin, IsCompanyOrAdmin, IsCompanyOrAdminOrOwner
 from api.services.cache_service import CacheService
+from api.services.upload_request_service import UploadRequestService
 
 
 class OnboardingAPIView(generics.UpdateAPIView):
@@ -146,6 +151,7 @@ class VideoDetailView(generics.RetrieveAPIView):
         share.access_count = F("access_count") + 1
         share.save(update_fields=["access_count"])
 
+        self._via_share_token = True
         return share.video
 
     def is_valid_uuid(self, identifier):
@@ -156,6 +162,7 @@ class VideoDetailView(generics.RetrieveAPIView):
             return False
 
     def get_object(self):
+        self._via_share_token = False
         identifier = self.kwargs.get(self.lookup_url_kwarg)
         if not identifier:
             raise Http404("Video identifier is required")
@@ -189,6 +196,10 @@ class VideoDetailView(generics.RetrieveAPIView):
 
     def check_video_availability(self, video):
         """Check if the video is available for viewing."""
+        # Share token grants access only for public and unlisted videos
+        if getattr(self, '_via_share_token', False):
+            return video.visibility != "private"
+
         # Admin users can always view videos
         if self.request.user.is_authenticated and self.request.user.role == "admin":
             return True
@@ -304,14 +315,13 @@ class CreateVideoShareAPI(generics.CreateAPIView):
 
     def create(self, request, *args, **kwargs):
         video_id = kwargs.get("video_id")
-        
-        # Use VideoShareService to handle the business logic
+
         share = VideoShareService.create_share(video_id, request.user)
-        
-        if not share:
+
+        if share is None:
             return Response(
-                {"error":AUTH_REQUIRED_MESSAGE},
-                status=status.HTTP_401_UNAUTHORIZED
+                {"error": "This video cannot be shared because it is private."},
+                status=status.HTTP_403_FORBIDDEN,
             )
 
         serializer = self.get_serializer(
@@ -422,11 +432,15 @@ class UploadVideoView(generics.CreateAPIView):
 
             CacheService.invalidate_video_lists()
 
+            profile, points_awarded = PointsService.award_points_for_video_upload(request.user)
+
             return Response(
                 {
                     "video_upload_url": video_upload_url,
                     "thumbnail_upload_url": thumbnail_upload_url,
                     "message": "SAS tokens generated successfully",
+                    "points_awarded": points_awarded,
+                    "total_points": profile.points,
                 },
                 status=status.HTTP_201_CREATED,
             )
@@ -783,3 +797,117 @@ class HealthCheckView(APIView):
         response_data.update(checks)
 
         return Response(response_data, status=status_code)
+
+
+class UploadRequestListCreateView(APIView):
+    permission_classes = [IsAuthenticated, IsCompanyOrAdmin]
+
+    def get(self, request):
+        limit = safe_int_param(request, "limit", 50, 1, 200)
+        offset = safe_int_param(request, "offset", 0, 0)
+        status_filter = request.query_params.get("status", None)
+
+        if request.user.role == "admin":
+            requests, total = UploadRequestService.get_all_requests(
+                status=status_filter, limit=limit, offset=offset
+            )
+        else:
+            requests, total = UploadRequestService.get_company_requests(
+                request.user, status=status_filter, limit=limit, offset=offset
+            )
+
+        serializer = UploadRequestListSerializer(requests, many=True)
+        return Response({
+            "results": serializer.data,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+        })
+
+    def post(self, request):
+        serializer = UploadRequestCreateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        upload_request = UploadRequestService.create_draft(
+            request.user, serializer.validated_data
+        )
+        result = UploadRequestDetailSerializer(upload_request).data
+        return Response(result, status=status.HTTP_201_CREATED)
+
+
+class UploadRequestDetailView(APIView):
+    permission_classes = [IsAuthenticated, IsCompanyOrAdmin]
+
+    def get(self, request, request_id):
+        upload_request = UploadRequestService.get_request_detail(request_id, request.user)
+        if not upload_request:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        if upload_request.company != request.user and request.user.role != "admin":
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = UploadRequestDetailSerializer(upload_request)
+        return Response(serializer.data)
+
+    def patch(self, request, request_id):
+        upload_request = UploadRequestService.get_request_detail(request_id, request.user)
+        if not upload_request:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            updated = UploadRequestService.update_draft(
+                upload_request, request.data, request.user
+            )
+            serializer = UploadRequestDetailSerializer(updated)
+            return Response(serializer.data)
+        except (PermissionError, ValueError) as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UploadRequestSubmitView(APIView):
+    permission_classes = [IsAuthenticated, IsCompanyOrAdmin]
+
+    def post(self, request, request_id):
+        upload_request = UploadRequestService.get_request_detail(request_id, request.user)
+        if not upload_request:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            updated = UploadRequestService.submit(upload_request, request.user)
+            serializer = UploadRequestDetailSerializer(updated)
+            return Response(serializer.data)
+        except (PermissionError, ValueError) as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UploadRequestCancelView(APIView):
+    permission_classes = [IsAuthenticated, IsCompanyOrAdmin]
+
+    def post(self, request, request_id):
+        upload_request = UploadRequestService.get_request_detail(request_id, request.user)
+        if not upload_request:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            updated = UploadRequestService.cancel(upload_request, request.user)
+            serializer = UploadRequestDetailSerializer(updated)
+            return Response(serializer.data)
+        except (PermissionError, ValueError) as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class CompanyAnalyticsView(APIView):
+    permission_classes = [IsAuthenticated, IsCompanyOrAdmin]
+
+    def get(self, request):
+        if request.user.role == "admin":
+            company_id = request.query_params.get("company_id", None)
+            if company_id:
+                company = get_object_or_404(User, id=company_id, role="company")
+                data = UploadRequestService.get_company_analytics(company)
+            else:
+                data = UploadRequestService.get_company_analytics(request.user)
+        else:
+            data = UploadRequestService.get_company_analytics(request.user)
+
+        return Response(data)

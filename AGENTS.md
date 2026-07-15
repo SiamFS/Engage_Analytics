@@ -220,6 +220,15 @@ Frontend:
 - Hero billboard image loads eagerly (above the fold, LCP-critical).
 - `React.lazy` + `Suspense` used in: `Home.jsx` (LoggedInView / NotLoggedInView), `Video.jsx` (AdCard), `Dashboard.jsx` (AdminDashboard).
 
-## Implementing the emotion pipeline
+## Upload feedback UI (WebcamRecorder)
+- Upload overlay shows three states: **progress** (animated bar + percentage), **success** (green checkmark + "Go Back" button), **error** (red icon + error message + "Go Back" + "Retry" buttons).
+- `uploadComplete` state keeps overlay visible after upload succeeds (instead of dismissing it).
+- Error state also keeps overlay visible; user clicks "Go Back" to dismiss and navigate back.
+- On "Go Back" click: clears `isUploading`, `uploadComplete`, `uploadError`, toasts, then navigates back one page (`navigate(-1)`).
+- `CheckCircle` icon imported from lucide-react for success display.
+- `pendingBlobRef` stores the recording blob so it can be retried on failure.
+- Error overlay shows the actual `error.message` from the catch block (not a generic message).
+- Retry button re-calls `uploadRecording(pendingBlobRef.current)` to re-attempt the upload.
+- Backend interaction endpoints (`view/`, `like/`, `share/`, `webcam-upload/`) use `videos/<int:video_id>/` — require integer PK, not UUID. VideoDetail passes `video?.id` (int PK from API response), not URL param `id` (UUID).
 See `.kilo/plans/1783710159599-emotion-analysis-pipeline.md` for the full,
 implementation-ready plan (models, endpoints, frontend, validation).

@@ -20,17 +20,17 @@ const PasswordInputField = ({ password, setPassword, showPassword, setShowPasswo
         type={showPassword ? "text" : "password"}
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        className="w-full min-w-0 px-3 sm:px-4 py-2 sm:py-2.5 bg-gray-700/50 border border-gray-600 rounded-[12px] sm:rounded-[14px] shadow-sm text-white text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors pr-10"
+        className="w-full min-w-0 px-3 sm:px-4 py-2 sm:py-2.5 bg-surface-600 border border-surface-500 rounded-lg shadow-sm text-white text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors pr-10"
         required
       />
       <button
         type="button"
         onClick={() => setShowPassword(!showPassword)}
-        className="absolute right-2.5 sm:right-3.5 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full p-1"
+        className="absolute right-2.5 sm:right-3.5 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-200 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500 rounded-full p-1"
         aria-label={showPassword ? "Hide password" : "Show password"}
         tabIndex={0}
       >
-        {showPassword ? <EyeOff size={16} className="sm:w-5 sm:h-5" /> : <Eye size={16} className="sm:w-5 sm:h-5" />}
+        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
       </button>
     </div>
   </div>
@@ -54,9 +54,9 @@ const ActionButtons = ({ loading, handleRemoveDevice, handleCancel }) => (
       whileTap={{ scale: 0.98 }}
       transition={{ duration: 0.2 }}
     >
-      <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-blue-500 to-blue-700 rounded-[12px] sm:rounded-[14px] shadow-md" />
-      <span className="absolute inset-0 w-full h-full bg-white/10 rounded-[12px] sm:rounded-[14px] blur-[1px]" />
-      <span className="absolute inset-0 w-full h-full bg-blue-600 rounded-[12px] sm:rounded-[14px] transform transition-transform group-hover:scale-[1.02] group-hover:brightness-110" />
+      <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-brand-500 to-brand-700 rounded-lg shadow-md" />
+      <span className="absolute inset-0 w-full h-full bg-white/10 rounded-lg blur-[1px]" />
+      <span className="absolute inset-0 w-full h-full bg-brand-600 rounded-lg transform transition-transform group-hover:scale-[1.02] group-hover:brightness-110" />
       <span className="relative flex items-center justify-center text-white font-medium py-2 sm:py-2.5 text-sm">
         {loading ? (
           <div className="flex items-center">
@@ -73,7 +73,7 @@ const ActionButtons = ({ loading, handleRemoveDevice, handleCancel }) => (
       type="button"
       onClick={handleCancel}
       disabled={loading}
-      className="w-1/2 py-2 px-4 bg-gray-600 hover:bg-gray-500 text-white rounded-[12px] text-sm font-medium transition-colors disabled:opacity-50"
+      className="w-1/2 py-2 px-4 bg-surface-500 hover:bg-surface-400 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
     >
       Cancel
     </button>
@@ -92,15 +92,15 @@ const DeviceItem = ({ device, isCurrentDevice, getDeviceIcon, formatLastActive, 
     initial={{ scale: 0.95, opacity: 0 }}
     animate={{ scale: 1, opacity: 1 }}
     transition={{ duration: 0.2 }}
-    className={`p-3 rounded-[12px] flex items-center justify-between ${
-      isCurrentDevice(device) 
-        ? 'bg-blue-900/30 border border-blue-700' 
-        : 'bg-gray-700/50 border border-gray-600'
-    }`}
+      className={`p-3 rounded-lg flex items-center justify-between ${
+        isCurrentDevice(device) 
+          ? 'bg-brand-600/20 border border-brand-500/40' 
+          : 'bg-surface-600 border border-surface-500'
+      }`}
   >
     <div className="flex items-center space-x-3">
       <div className={`p-2 rounded-full ${
-        isCurrentDevice(device) ? 'bg-blue-700/50' : 'bg-gray-600/50'
+        isCurrentDevice(device) ? 'bg-brand-700/50' : 'bg-surface-500/50'
       }`}>
         {getDeviceIcon(device.name)}
       </div>
@@ -108,7 +108,7 @@ const DeviceItem = ({ device, isCurrentDevice, getDeviceIcon, formatLastActive, 
         <p className="text-white text-sm font-medium">
           {device.name} 
           {isCurrentDevice(device) && (
-            <span className="ml-2 text-xs bg-blue-600 text-white px-2 py-0.5 rounded-full">
+            <span className="ml-2 text-xs bg-brand-600 text-white px-2 py-0.5 rounded-full">
               Current
             </span>
           )}
@@ -123,7 +123,7 @@ const DeviceItem = ({ device, isCurrentDevice, getDeviceIcon, formatLastActive, 
       onClick={() => onRemoveClick(device)}
       className={`p-2 rounded-full transition-colors ${
         isCurrentDevice(device)
-          ? 'text-blue-400 hover:text-blue-300 hover:bg-blue-800/50'
+          ? 'text-brand-400 hover:text-brand-300 hover:bg-brand-600/50'
           : 'text-gray-400 hover:text-red-400 hover:bg-red-900/20'
       }`}
       aria-label="Remove device"
@@ -152,7 +152,7 @@ const RemovalConfirmation = ({ selectedDevice, password, setPassword, showPasswo
     exit={{ opacity: 0 }}
     className="space-y-4"
   >
-    <div className="p-4 bg-gray-700/50 rounded-[12px] border border-gray-600">
+    <div className="p-4 bg-surface-600 rounded-lg border border-surface-500">
       <h3 className="text-white font-medium mb-2">Remove Device</h3>
       <p className="text-gray-300 text-sm mb-4">
         You are about to remove access from: <span className="font-semibold text-white">{selectedDevice?.name}</span>
@@ -226,7 +226,7 @@ const DeviceList = ({ devices, error, isCurrentDevice, getDeviceIcon, formatLast
     <div className="text-center pt-2">
       <button
         onClick={loadDevices}
-        className="text-blue-400 hover:text-blue-300 text-sm font-medium focus:outline-none"
+        className="text-brand-400 hover:text-brand-300 text-sm font-medium focus:outline-none"
       >
         Refresh devices
       </button>
@@ -304,8 +304,10 @@ const formatLastActive = (dateString) => {
   }
 };
 
+const MAX_DISPLAY_DEVICES = 5;
+
 const DeviceManager = () => {
-  const { getUserDevices, removeDevice, maxDevices } = useContext(AuthContext);
+  const { getUserDevices, removeDevice, maxDevices, user } = useContext(AuthContext);
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -315,6 +317,8 @@ const DeviceManager = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [success, setSuccess] = useState('');
   const navigate = useNavigate();
+
+  const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
     loadDevices();
@@ -326,9 +330,8 @@ const DeviceManager = () => {
       setError('');
       const userDevices = await getUserDevices();
       
-      // Sort devices
-      const sortedDevices = sortDevices(userDevices);
-      setDevices(sortedDevices);
+      const sortedDevices = sortDevices(userDevices || []);
+      setDevices(sortedDevices.slice(0, MAX_DISPLAY_DEVICES));
     } catch (err) {
       console.error("Error loading devices:", err);
       setError("Failed to load your devices. Please try again.");
@@ -338,12 +341,13 @@ const DeviceManager = () => {
   };
 
   const sortDevices = (userDevices) => {
-    return userDevices.sort((a, b) => {
-      // Current device first
-      if (a.id === window.TokenService?.getCurrentDeviceId()) return -1;
-      if (b.id === window.TokenService?.getCurrentDeviceId()) return 1;
-      
-      return new Date(b.lastActive) - new Date(a.lastActive);
+    if (!Array.isArray(userDevices)) return [];
+    return [...userDevices].sort((a, b) => {
+      const aCurrent = String(a.id) === String(window.TokenService?.getCurrentDeviceId?.() || '');
+      const bCurrent = String(b.id) === String(window.TokenService?.getCurrentDeviceId?.() || '');
+      if (aCurrent) return -1;
+      if (bCurrent) return 1;
+      return new Date(b.lastActive || 0) - new Date(a.lastActive || 0);
     });
   };
 
@@ -413,26 +417,26 @@ const DeviceManager = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 pt-20 pb-10 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-surface pt-20 pb-10 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl mx-auto">
         <div className="mb-6 flex items-center">
           <button 
             onClick={handleBackClick} 
-            className="mr-3 p-2 rounded-full bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white"
+            className="mr-3 p-2 rounded-full bg-elevated hover:bg-surface-600 text-gray-300 hover:text-white"
           >
             <ArrowLeft size={20} />
           </button>
           <h1 className="text-2xl font-semibold text-white">Device Management</h1>
         </div>
         
-        <div className="bg-gray-800/80 backdrop-blur-md rounded-[16px] border border-gray-700 shadow-md p-4 sm:p-6 w-full">
+        <div className="bg-elevated rounded-xl border border-elevated-border shadow-md p-4 sm:p-6 w-full">
           <AnimatePresence mode="wait">
             {success && (
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="mb-4 p-3 bg-green-800/40 border border-green-700 rounded-[12px] text-green-400 text-sm"
+                className="mb-4 p-3 bg-green-800/40 border border-green-700 rounded-lg text-green-400 text-sm"
               >
                 {success}
               </motion.div>
@@ -440,17 +444,31 @@ const DeviceManager = () => {
           </AnimatePresence>
           
           <div className="mb-4">
-            <p className="text-gray-300 text-sm">
-              You can be logged in on up to <span className="font-semibold text-white">{maxDevices}</span> devices at the same time.
-            </p>
-            <p className="text-gray-300 text-sm mt-1">
-              Current active devices: <span className="font-semibold text-white">{devices.length}</span> of {maxDevices}
-            </p>
+            {isAdmin ? (
+              <p className="text-gray-300 text-sm">
+                Showing <span className="font-semibold text-white">{devices.length}</span> most recent devices. 
+                <span className="text-gray-500 ml-1">(Admin — no device limit)</span>
+              </p>
+            ) : (
+              <>
+                <p className="text-gray-300 text-sm">
+                  You can be logged in on up to <span className="font-semibold text-white">{maxDevices}</span> devices at the same time.
+                </p>
+                <p className="text-gray-300 text-sm mt-1">
+                  Current active devices: <span className="font-semibold text-white">{devices.length}</span> of {maxDevices}
+                </p>
+              </>
+            )}
+            {devices.length >= MAX_DISPLAY_DEVICES && (
+              <p className="text-xs text-gray-500 mt-2">
+                Only the {MAX_DISPLAY_DEVICES} most recent devices are shown.
+              </p>
+            )}
           </div>
           
           {loading && !removing ? (
             <div className="text-center py-8">
-              <div className="inline-block animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+              <div className="inline-block animate-spin h-8 w-8 border-4 border-brand-500 border-t-transparent rounded-full"></div>
               <p className="text-gray-400 mt-2">Loading your devices...</p>
             </div>
           ) : (

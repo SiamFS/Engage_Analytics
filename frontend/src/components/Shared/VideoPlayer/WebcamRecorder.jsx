@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import PropTypes from 'prop-types';
 import { Modal, Button, Alert, Select } from 'flowbite-react';
-import { Camera, CameraOff, Info, RefreshCw, SwitchCamera, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { Camera, CameraOff, Info, RefreshCw, SwitchCamera, Eye, EyeOff, ArrowLeft, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import VideoService from '../../../utils/VideoService';
 import { FaceTracker } from '../../../utils/FaceTracker';
@@ -29,6 +29,7 @@ const WebcamRecorder = forwardRef(({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
+  const [uploadComplete, setUploadComplete] = useState(false);
   const [deviceError, setDeviceError] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
   const [showTroubleshootModal, setShowTroubleshootModal] = useState(false);
@@ -55,10 +56,44 @@ const WebcamRecorder = forwardRef(({
   const chunksRef = useRef([]);
   const streamRef = useRef(null);
   const recordingTimeoutRef = useRef(null);
+  const pendingBlobRef = useRef(null);
   const mountedRef = useRef(true);
   const recordingCompletedRef = useRef(false);
   const faceTrackerRef = useRef(null);
   const facePreCheckTimerRef = useRef(null);
+  const [pipPos, setPipPos] = useState({ x: 16, y: 72 });
+  const dragRef = useRef({ dragging: false, startX: 0, startY: 0, startPosX: 0, startPosY: 0 });
+
+  const handlePipMouseDown = (e) => {
+    dragRef.current.dragging = true;
+    dragRef.current.startX = e.clientX;
+    dragRef.current.startY = e.clientY;
+    dragRef.current.startPosX = pipPos.x;
+    dragRef.current.startPosY = pipPos.y;
+    document.body.style.userSelect = 'none';
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!dragRef.current.dragging) return;
+      const dx = e.clientX - dragRef.current.startX;
+      const dy = e.clientY - dragRef.current.startY;
+      const newX = Math.max(0, Math.min(window.innerWidth - 220, dragRef.current.startPosX + dx));
+      const newY = Math.max(0, Math.min(window.innerHeight - 190, dragRef.current.startPosY + dy));
+      setPipPos({ x: newX, y: newY });
+    };
+    const handleMouseUp = () => {
+      dragRef.current.dragging = false;
+      document.body.style.userSelect = '';
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.userSelect = '';
+    };
+  }, [pipPos]);
   const faceWasMetRef = useRef(true);
   const facePreCheckDoneRef = useRef(false);
   const handleFaceResultRef = useRef(null);
@@ -326,6 +361,8 @@ const WebcamRecorder = forwardRef(({
         }
         setFacePreCheckDone(true);
         facePreCheckDoneRef.current = true;
+        faceAwayRef.current = false;
+        if (onFaceBlockedChange) onFaceBlockedChange(false);
         if (facePreCheckTimerRef.current) {
           clearTimeout(facePreCheckTimerRef.current);
           facePreCheckTimerRef.current = null;
@@ -388,6 +425,8 @@ const WebcamRecorder = forwardRef(({
         console.warn('[FaceTracker] Model failed to load — running without face verification');
         setFaceTrackerFailed(true);
         setFacePreCheckDone(true);
+        faceAwayRef.current = false;
+        if (onFaceBlockedChange) onFaceBlockedChange(false);
         addToast('Face verification unavailable — rewards still active', 'info', 4000);
         return;
       }
@@ -395,13 +434,14 @@ const WebcamRecorder = forwardRef(({
       faceTrackerRef.current = tracker;
       setFaceTrackerReady(true);
 
-      faceWasMetRef.current = true;
-      faceAwayRef.current = false;
+      faceWasMetRef.current = false;
+      faceAwayRef.current = true;
+      if (onFaceBlockedChange) onFaceBlockedChange(true);
 
       preCheckToastIdRef.current = addToast(
-        'Please position your face in the center of the camera',
+        'Position your face in the center of the camera',
         'info',
-        0
+        8000
       );
 
       tracker.start(webcamRef.current, (result) => {
@@ -425,6 +465,8 @@ const WebcamRecorder = forwardRef(({
       console.warn('[FaceTracker] Init error:', err);
       setFaceTrackerFailed(true);
       setFacePreCheckDone(true);
+      faceAwayRef.current = false;
+      if (onFaceBlockedChange) onFaceBlockedChange(false);
     }
   };
 
@@ -522,7 +564,7 @@ const WebcamRecorder = forwardRef(({
     
         constraints = { 
           video: { deviceId: { exact: deviceId } },
-          audio: false 
+          audio: false
         };
       } else {
         constraints = {
@@ -629,26 +671,11 @@ const WebcamRecorder = forwardRef(({
       setIsPaused(false);
       console.log('Webcam recording started');
       
-      // Schedule a recording restart after 60 seconds to prevent potential browser bugs
+      // Clear any stale timeout ref
       if (recordingTimeoutRef.current) {
         clearTimeout(recordingTimeoutRef.current);
+        recordingTimeoutRef.current = null;
       }
-      
-      recordingTimeoutRef.current = setTimeout(() => {
-        if (!mountedRef.current) return;
-        if (isRecording && !isPaused && mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-          console.log('Restarting recording to prevent browser issues...');
-          
-          mediaRecorderRef.current.stop();
-          
-          // Start a new recorder after a short delay
-          setTimeout(() => {
-            if (mountedRef.current && streamRef.current && isVideoPlaying) {
-              startRecording();
-            }
-          }, 500);
-        }
-      }, 60000); // 60 seconds
       
     } catch (error) {
       console.error('Error starting recording:', error);
@@ -680,27 +707,11 @@ const WebcamRecorder = forwardRef(({
         setIsPaused(false);
         console.log('Webcam recording resumed');
         
-        // Restart the timeout for auto-restart mechanism
+        // Clear any stale timeout ref
         if (recordingTimeoutRef.current) {
           clearTimeout(recordingTimeoutRef.current);
+          recordingTimeoutRef.current = null;
         }
-        
-        recordingTimeoutRef.current = setTimeout(() => {
-          if (!mountedRef.current) return;
-          if (isRecording && !isPaused && mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-            console.log('Restarting recording to prevent browser issues...');
-            
-            // Stop the current recorder
-            mediaRecorderRef.current.stop();
-            
-            // Start a new recorder after a short delay
-            setTimeout(() => {
-              if (mountedRef.current && streamRef.current && isVideoPlaying) {
-                startRecording();
-              }
-            }, 500);
-          }
-        }, 60000); // 60 seconds
       } catch (error) {
         console.error('Error resuming recording:', error);
       }
@@ -719,15 +730,13 @@ const WebcamRecorder = forwardRef(({
     return new Promise((resolve, reject) => {
       const handleStop = async () => {
         try {
-          // Wait a short delay to ensure all chunks are processed
           await new Promise(r => setTimeout(r, 500));
           
-          // Create a new Blob from all chunks
           const recordingBlob = new Blob(chunksRef.current, { type: 'video/webm' });
           
-          // Only upload if we have actual content
           if (recordingBlob.size > 0) {
             console.log(`Recording stopped with ${chunksRef.current.length} chunks, size: ${recordingBlob.size} bytes`);
+            pendingBlobRef.current = recordingBlob;
             await uploadRecording(recordingBlob);
             resolve();
           } else {
@@ -829,6 +838,7 @@ const WebcamRecorder = forwardRef(({
 
       console.log('Webcam recording uploaded successfully');
       recordingCompletedRef.current = true;
+      pendingBlobRef.current = null;
 
       // Signal the backend that the blob upload finished so the analysis
       // cron can pick this recording up. Best-effort; do not block the UI.
@@ -840,15 +850,20 @@ const WebcamRecorder = forwardRef(({
         }
       }
 
-      setIsUploading(false);
+      setUploadComplete(true);
     } catch (error) {
       console.error('Error uploading recording:', error);
-      setUploadError('Failed to upload recording. Please try again.');
-      setIsUploading(false);
+      setUploadError(error.message || 'Failed to upload recording. Please try again.');
       if (onError) onError('Upload failed: ' + error.message);
     }
   };
-  
+
+  const retryUpload = async () => {
+    if (!pendingBlobRef.current) return;
+    setUploadError(null);
+    await uploadRecording(pendingBlobRef.current);
+  };
+
   // Global MediaRecorder error handler — registered once at component mount
   const mediaRecorderErrorRef = useRef(null);
   useEffect(() => {
@@ -869,10 +884,20 @@ const WebcamRecorder = forwardRef(({
       recordingTimeoutRef.current = null;
     }
     
-    // Stop recording if active
+    // Stop recording if active and upload pending chunks
     if (mediaRecorderRef.current) {
       try {
         if (mediaRecorderRef.current.state !== 'inactive') {
+          // Fire-and-forget upload of existing chunks on cleanup
+          if (chunksRef.current.length > 0) {
+            const chunks = [...chunksRef.current];
+            mediaRecorderRef.current.onstop = () => {
+              const blob = new Blob(chunks, { type: 'video/webm' });
+              if (blob.size > 0) {
+                uploadRecording(blob);
+              }
+            };
+          }
           mediaRecorderRef.current.stop();
         }
         mediaRecorderRef.current = null;
@@ -971,9 +996,13 @@ const WebcamRecorder = forwardRef(({
     <>
       {/* Webcam PiP preview — top-left, below navbar in normal mode */}
       {webcamPermission === 'granted' && !deviceError && videoDevices.length > 0 && (
-        <div className={`${isFullscreen ? 'absolute' : 'fixed'} z-50 ${isFullscreen ? 'top-4' : 'top-[72px]'} left-4 flex flex-col items-center`}>
+        <div
+          className={`${isFullscreen ? 'absolute' : 'fixed'} z-50`}
+          style={{ top: pipPos.y, left: pipPos.x }}
+          onMouseDown={handlePipMouseDown}
+        >
           <div className={`transition-all duration-300 ${showRecordingIndicator ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-            <div className="relative rounded-lg overflow-hidden border-2 border-gray-600 shadow-lg bg-black" style={{ width: '160px', height: '120px' }}>
+            <div className="relative rounded-lg overflow-hidden border-2 border-surface-500 shadow-lg bg-black" style={{ width: '160px', height: '120px' }}>
               <video
                 ref={webcamRef}
                 autoPlay
@@ -982,7 +1011,7 @@ const WebcamRecorder = forwardRef(({
                 className="w-full h-full object-cover"
               />
               {hasExistingRecording && (
-                <div className="absolute top-1 left-1 right-1 flex items-center bg-blue-600/80 px-1.5 py-0.5 rounded text-xs text-white">
+                <div className="absolute top-1 left-1 right-1 flex items-center bg-brand-600/80 px-1.5 py-0.5 rounded text-xs text-white">
                   <CameraOff size={10} className="mr-1 shrink-0" />
                   <span className="truncate">Already recorded</span>
                 </div>
@@ -1014,10 +1043,10 @@ const WebcamRecorder = forwardRef(({
         </div>
       )}
 
-      {/* Eye toggle — in the controls bar area (bottom-right), opacity matches controls visibility */}
+      {/* Eye toggle — above the controls bar at top-right */}
       <button
         onClick={toggleRecordingIndicator}
-        className={`absolute bottom-4 right-20 z-30 flex items-center bg-gray-900/80 backdrop-blur-sm p-2 rounded-full text-white hover:bg-gray-800/80 transition-all duration-300 ${showControls || pipVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        className={`absolute top-4 right-4 z-30 flex items-center bg-gray-900/80 backdrop-blur-sm p-2 rounded-full text-white hover:bg-gray-800/80 transition-all duration-300 ${showControls || pipVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         title={showRecordingIndicator ? 'Hide camera preview' : 'Show camera preview'}
         type="button"
       >
@@ -1028,7 +1057,7 @@ const WebcamRecorder = forwardRef(({
       {webcamPermission === 'denied' && isVideoPlaying && (
         <button
           onClick={() => setShowPermissionModal(true)}
-          className="absolute bottom-0 left-0 right-0 z-20 px-4 py-2 bg-gray-900/80 backdrop-blur-sm border-t border-gray-700 hover:bg-gray-800/80 transition-colors cursor-pointer text-left"
+          className="absolute bottom-0 left-0 right-0 z-20 px-4 py-2 bg-surface/80 backdrop-blur-sm border-t border-elevated-border hover:bg-surface-600 transition-colors cursor-pointer text-left"
           type="button"
         >
           <p className="text-gray-300 text-xs text-center">
@@ -1038,17 +1067,17 @@ const WebcamRecorder = forwardRef(({
         </button>
       )}
 
-      {/* Toast notifications overlay */}
+      {/* Toast notifications overlay — max 2 visible, auto-dismiss sticky toasts */}
       {toasts.length > 0 && (
-        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 items-center pointer-events-none">
-          {toasts.map(t => (
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-1.5 items-center pointer-events-none max-w-[90%]">
+          {toasts.slice(0, 2).map(t => (
             <div
               key={t.id}
-              className={`px-4 py-2 rounded-lg shadow-lg text-sm font-medium text-white whitespace-nowrap ${
-                t.type === 'success' ? 'bg-green-600' :
-                t.type === 'warning' ? 'bg-yellow-600' :
-                t.type === 'error' ? 'bg-red-600' :
-                'bg-blue-600'
+              className={`px-3 py-1.5 rounded-lg shadow-lg text-xs font-medium text-white truncate max-w-full ${
+                t.type === 'success' ? 'bg-green-600/90' :
+                t.type === 'warning' ? 'bg-yellow-600/90' :
+                t.type === 'error' ? 'bg-red-600/90' :
+                'bg-brand-600/90'
               }`}
               onClick={() => dismissToast(t.id)}
               role="alert"
@@ -1056,29 +1085,94 @@ const WebcamRecorder = forwardRef(({
               {t.message}
             </div>
           ))}
+          {toasts.length > 2 && (
+            <div className="text-xs text-gray-400">+{toasts.length - 2} more</div>
+          )}
         </div>
       )}
 
-      {/* Upload progress overlay */}
+      {/* Upload overlay — progress, success, error */}
       {isUploading && (
         <div className="fixed inset-0 bg-black/80 flex flex-col items-center justify-center z-50">
           <div className="max-w-md w-full p-6 bg-gray-800 rounded-lg">
-            <h3 className="text-xl font-semibold text-white mb-4">Uploading Recording</h3>
-            <div className="mb-4">
-              <div className="h-2 w-full bg-gray-700 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-blue-500 transition-all duration-300"
-                  style={{ width: `${uploadProgress}%` }}
-                />
+            {uploadComplete ? (
+              <div className="flex flex-col items-center">
+                <div className="w-16 h-16 bg-green-900/40 rounded-full flex items-center justify-center mb-4">
+                  <CheckCircle className="text-green-400" size={36} />
+                </div>
+                <h3 className="text-xl font-semibold text-white mb-2">Upload Complete</h3>
+                <p className="text-gray-400 mb-6 text-center">
+                  Your webcam recording has been uploaded successfully.
+                </p>
+                <Button
+                  color="blue"
+                  onClick={() => {
+                    setIsUploading(false);
+                    setUploadComplete(false);
+                    setUploadError(null);
+                    clearToasts();
+                    navigate(-1);
+                  }}
+                  className="min-w-[180px]"
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Go Back
+                </Button>
               </div>
-              <p className="text-white mt-2 text-center">{Math.round(uploadProgress)}%</p>
-            </div>
-            <Alert color="warning">
-              <div className="flex items-center">
-                <Info className="h-4 w-4 mr-2" />
-                <span>Please don't close this window until upload completes</span>
+            ) : uploadError ? (
+              <div className="flex flex-col items-center">
+                <div className="w-16 h-16 bg-red-900/40 rounded-full flex items-center justify-center mb-4">
+                  <CameraOff className="text-red-400" size={36} />
+                </div>
+                <h3 className="text-xl font-semibold text-white mb-2">Upload Failed</h3>
+                <p className="text-gray-400 mb-2 text-center">{uploadError}</p>
+                <p className="text-gray-500 mb-6 text-sm text-center">
+                  Your recording may not have been saved.
+                </p>
+                <div className="flex gap-3">
+                  <Button
+                    color="gray"
+                    onClick={() => {
+                      setIsUploading(false);
+                      setUploadError(null);
+                      clearToasts();
+                      navigate(-1);
+                    }}
+                  >
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Go Back
+                  </Button>
+                  {pendingBlobRef.current && (
+                    <Button
+                      color="blue"
+                      onClick={retryUpload}
+                    >
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Retry
+                    </Button>
+                  )}
+                </div>
               </div>
-            </Alert>
+            ) : (
+              <>
+                <h3 className="text-xl font-semibold text-white mb-4">Uploading Recording</h3>
+                <div className="mb-4">
+                  <div className="h-2 w-full bg-elevated rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-brand-500 transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                  <p className="text-white mt-2 text-center">{Math.round(uploadProgress)}%</p>
+                </div>
+                <Alert color="warning">
+                  <div className="flex items-center">
+                    <Info className="h-4 w-4 mr-2" />
+                    <span>Please don't close this window until upload completes</span>
+                  </div>
+                </Alert>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -1093,15 +1187,16 @@ const WebcamRecorder = forwardRef(({
         }}
         size="md"
         dismissible
+        theme={{ content: { inner: 'relative flex max-h-[90dvh] flex-col rounded-lg bg-gray-800 shadow' } }}
       >
-        <Modal.Header className="bg-gray-800 text-white border-b border-gray-700">
+        <Modal.Header className="bg-elevated text-white border-b border-elevated-border">
           <p className="text-white">
           Webcam Recording
           </p>
         </Modal.Header>
         <Modal.Body className="bg-gray-800 text-gray-300">
           <div className="flex flex-col items-center">
-            <Camera size={48} className="text-blue-400 mb-4" />
+            <Camera size={48} className="text-brand-400 mb-4" />
             <p className="mb-4 text-center">
               Enable your webcam to earn rewards while watching. Your reactions help creators 
               understand what works.
@@ -1111,7 +1206,7 @@ const WebcamRecorder = forwardRef(({
             </Alert>
           </div>
         </Modal.Body>
-        <Modal.Footer className="bg-gray-800 border-t border-gray-700">
+        <Modal.Footer className="bg-elevated border-t border-elevated-border">
           <div className="flex justify-center w-full">
             <Button
               color="blue"
@@ -1131,9 +1226,10 @@ const WebcamRecorder = forwardRef(({
         onClose={() => setShowDeviceSelector(false)}
         size="md"
         dismissible={videoDevices.length === 0}
+        theme={{ content: { inner: 'relative flex max-h-[90dvh] flex-col rounded-lg bg-gray-800 shadow' } }}
       >
         {videoDevices.length > 0 && (
-          <div className="bg-gray-800 text-white border-b border-gray-700 px-6 py-4 text-lg font-semibold">
+          <div className="bg-elevated text-white border-b border-elevated-border px-6 py-4 text-lg font-semibold">
             Select Camera
           </div>
         )}
@@ -1149,7 +1245,7 @@ const WebcamRecorder = forwardRef(({
                     id="camera-selector"
                     value={selectedDeviceId}
                     onChange={(e) => setSelectedDeviceId(e.target.value)}
-                    className="bg-gray-700 text-white border-gray-600"
+                    className="bg-surface-600 text-white border-surface-500"
                   >
                     {videoDevices.map((device, index) => (
                       <option key={device.deviceId} value={device.deviceId}>
@@ -1178,7 +1274,7 @@ const WebcamRecorder = forwardRef(({
           </div>
         </Modal.Body>
         {videoDevices.length > 0 && (
-          <Modal.Footer className="bg-gray-800 border-t border-gray-700">
+          <Modal.Footer className="bg-elevated border-t border-elevated-border">
             <div className="flex justify-center w-full">
               <Button
                 color="blue"
@@ -1198,8 +1294,9 @@ const WebcamRecorder = forwardRef(({
         show={showTroubleshootModal}
         onClose={() => setShowTroubleshootModal(false)}
         size="md"
+        theme={{ content: { inner: 'relative flex max-h-[90dvh] flex-col rounded-lg bg-gray-800 shadow' } }}
       >
-        <Modal.Header className="bg-gray-800 text-white border-b border-gray-700">
+        <Modal.Header className="bg-elevated text-white border-b border-elevated-border">
           Camera Access Problem
         </Modal.Header>
         <Modal.Body className="bg-gray-800 text-gray-300">
@@ -1219,7 +1316,7 @@ const WebcamRecorder = forwardRef(({
             </ul>
           </div>
         </Modal.Body>
-        <Modal.Footer className="bg-gray-800 border-t border-gray-700">
+        <Modal.Footer className="bg-elevated border-t border-elevated-border">
           <div className="flex justify-center gap-3 w-full">
             <Button
               color="gray"

@@ -106,4 +106,16 @@ class FirebaseAuthentication(authentication.BaseAuthentication):
                 role=user_data['role']
             )
             self._create_user_profile(user, user_data['role'])
+
+            try:
+                from api.services.notification_service import NotificationService
+                NotificationService.notify_admins(
+                    notification_type="new_user_registered",
+                    title=f"New {user_data['role']} registered",
+                    message=f"{user_data['email']} signed up as a {user_data['role']}.",
+                    data={"user_id": user.id, "email": user_data['email'], "role": user_data['role']},
+                )
+            except Exception:
+                logger.exception("Failed to notify admins of new user registration")
+
             return user

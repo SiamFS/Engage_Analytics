@@ -3,6 +3,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
 from api.models import Video, VideoView
+from api.services.notification_service import NotificationService
 
 class VideoViewService:
     """Service for handling video view operations"""
@@ -28,8 +29,13 @@ class VideoViewService:
         # Check if privacy should be changed
         privacy_changed = False
         if cls.should_make_private(video):
-            cls.make_video_private(video)
+            was_already_private = video.visibility == "private"
+            made_private = cls.make_video_private(video)
             privacy_changed = True
+
+            if made_private:
+                reason = "view_limit" if (video.view_limit and video.views >= video.view_limit) else "expired"
+                cls._notify_privacy_change(video, reason)
             
         return video, new_view_count, privacy_changed
     
@@ -72,3 +78,22 @@ class VideoViewService:
             video.save(update_fields=["visibility"])
             return True
         return False
+
+    @staticmethod
+    def _notify_privacy_change(video, reason):
+        if reason == "view_limit":
+            NotificationService.notify_video_uploader(
+                video,
+                notification_type="video_view_limit_reached",
+                title="View limit reached",
+                message=f"Your video \"{video.title}\" has reached its view limit ({video.view_limit}) and has been set to private.",
+                data={"video_id": video.id, "view_limit": video.view_limit, "views": video.views},
+            )
+        elif reason == "expired":
+            NotificationService.notify_video_uploader(
+                video,
+                notification_type="video_auto_privated",
+                title="Video auto-privated",
+                message=f"Your video \"{video.title}\" has expired and has been set to private.",
+                data={"video_id": video.id},
+            )

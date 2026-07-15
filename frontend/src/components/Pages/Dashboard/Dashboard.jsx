@@ -1,5 +1,5 @@
 import React, { useState, useContext, useEffect, lazy, Suspense } from 'react';
-import { Outlet, useLocation, Link } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { AuthContext } from '../../../contexts/AuthProvider/AuthProvider';
 import { Alert, Spinner, Button } from 'flowbite-react';
 import { AlertCircle } from 'lucide-react';
@@ -113,23 +113,6 @@ const Dashboard = () => {
 
   const renderDashboardContent = () => {
     if (!isMainDashboard) {
-      // For admin routes, we need to check permissions
-      const isAdminRoute = location.pathname.includes('/dashboard/edit-video/') || 
-                       location.pathname === '/dashboard/videos';
-                       
-      if (isAdminRoute && user?.role !== 'admin' && user?.role !== 'company') {
-        return (
-          <div className="p-6 bg-gray-800 rounded-lg border border-gray-700 text-center">
-            <Alert color="failure" className="mb-4">
-              You don't have permission to access this page
-            </Alert>
-            <Button color="blue" as={Link} to="/dashboard">
-              Return to Dashboard
-            </Button>
-          </div>
-        );
-      }
-      
       return <Outlet />;
     }
     

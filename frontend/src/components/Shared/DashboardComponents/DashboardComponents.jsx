@@ -1,7 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
-import { Card, Button, Progress } from 'flowbite-react';
+import { Button } from 'flowbite-react';
 import {
   Play,
   ThumbsUp,
@@ -11,19 +11,19 @@ import {
 } from 'lucide-react';
 
 export const StatsCard = ({ title, value, icon: Icon, color }) => (
-  <Card className="bg-gray-800 border-gray-700 shadow-md">
+  <div className="card-base bg-elevated border-elevated-border hover:border-white/20 p-5 hover:-translate-y-0.5">
     <div className="flex items-center justify-between">
       <div>
         <p className="text-sm font-medium text-gray-400">{title}</p>
-        <h5 className="text-2xl font-bold tracking-tight text-white mt-1">
+        <h5 className="text-2xl font-bold tracking-tight text-white mt-1.5">
           {(typeof value === 'number' ? value.toLocaleString() : value) || '0'}
         </h5>
       </div>
-      <div className={`p-3 rounded-lg bg-${color}-500 bg-opacity-20`}>
-        {Icon && <Icon size={24} className={`text-${color}-400`} />}
+      <div className={`p-3.5 rounded-xl`} style={{backgroundColor: `color-mix(in srgb, var(--color-${color}-500) 10%, transparent)`}}>
+        {Icon && <Icon size={22} style={{color: `var(--color-${color}-400)`}} />}
       </div>
     </div>
-  </Card>
+  </div>
 );
 
 StatsCard.propTypes = {
@@ -43,15 +43,24 @@ export const StorageCard = ({ storageUsed }) => {
   const storageColor = getStorageColor(storageUsed);
 
   return (
-    <Card className="bg-gray-800 border-gray-700 shadow-md">
+    <div className="card-base bg-elevated border-elevated-border hover:border-white/20 p-5 hover:-translate-y-0.5 group">
       <div>
-        <div className="flex justify-between items-center mb-2">
+        <div className="flex justify-between items-center mb-3">
           <p className="text-sm font-medium text-gray-400">Storage Used</p>
-          <span className="text-sm font-medium text-white">{storageUsed}%</span>
+          <span className="text-sm font-semibold text-white">{storageUsed}%</span>
         </div>
-        <Progress progress={storageUsed} size="md" color={storageColor} />
+        <div className="h-2.5 bg-surface-600 rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all duration-500 ${
+              storageColor === 'red' ? 'bg-red-500' :
+              storageColor === 'yellow' ? 'bg-yellow-500' :
+              'bg-brand-500'
+            }`}
+            style={{ width: `${Math.min(storageUsed, 100)}%` }}
+          />
+        </div>
       </div>
-    </Card>
+    </div>
   );
 };
 
@@ -60,14 +69,17 @@ StorageCard.propTypes = {
 };
 
 export const EmptyAdRow = ({ title, icon, linkPath, linkText }) => (
-  <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 shadow-md">
+  <div className="card-base bg-elevated border-elevated-border p-6">
     <h2 className="text-xl font-bold text-white mb-4 flex items-center">
       {icon && <span className="mr-2">{icon}</span>}
       {title}
     </h2>
-    <div className="text-center py-6">
-      <p className="text-gray-400 mb-4">You haven't uploaded any videos yet.</p>
-      <Button color="blue" size="sm" className="glossy-button" as={Link} to={linkPath}>
+    <div className="text-center py-8">
+      <div className="w-16 h-16 rounded-full bg-surface-600 flex items-center justify-center mx-auto mb-4">
+        <Play size={28} className="text-gray-500" />
+      </div>
+      <p className="text-gray-400 mb-5">You haven&apos;t uploaded any videos yet.</p>
+      <Button color="blue" size="sm" className="bg-brand-600 hover:bg-brand-700 focus:ring-0" as={Link} to={linkPath}>
         {linkText}
       </Button>
     </div>
@@ -83,21 +95,30 @@ EmptyAdRow.propTypes = {
 
 export const AnalyticsPreview = ({ hasVideos }) => (
   hasVideos && (
-    <Card className="bg-gray-800 border-gray-700 shadow-md">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+    <div className="card-base bg-elevated border-elevated-border p-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-5">
         <h2 className="text-xl font-bold text-white flex items-center">
-          <BarChart2 size={20} className="mr-2 text-gray-400"/> Quick Analytics
+          <BarChart2 size={20} className="mr-2 text-brand-400"/> Quick Analytics
         </h2>
         <Link to="/dashboard/analytics">
-          <Button color="gray" size="xs" pill className="bg-gray-700 hover:bg-gray-600 text-gray-200">
+          <Button color="gray" size="xs" pill className="bg-surface-600 hover:bg-surface-500 text-gray-200 border-0 focus:ring-0">
             View Detailed Analytics
           </Button>
         </Link>
       </div>
-      <div className="relative h-64 bg-gray-700 rounded-lg flex items-center justify-center">
-        <p className="text-gray-400 italic">Analytics chart placeholder</p>
+      <div className="relative h-64 bg-surface-600/50 rounded-xl border border-elevated-border flex items-center justify-center overflow-hidden">
+        <div className="absolute inset-0 opacity-5">
+          <svg viewBox="0 0 400 200" className="w-full h-full">
+            <polyline fill="none" stroke="#3b82f6" strokeWidth="2" points="0,150 40,120 80,140 120,80 160,100 200,40 240,60 280,30 320,50 360,20 400,40" />
+            <polyline fill="none" stroke="#22c55e" strokeWidth="2" points="0,180 40,160 80,170 120,130 160,140 200,90 240,100 280,70 320,80 360,50 400,60" />
+          </svg>
+        </div>
+        <div className="text-center relative z-10">
+          <BarChart2 size={40} className="mx-auto mb-2 text-gray-500" />
+          <p className="text-gray-400 text-sm">Analytics data will appear here</p>
+        </div>
       </div>
-    </Card>
+    </div>
   )
 );
 
@@ -146,23 +167,21 @@ StatsOverview.propTypes = {
   }).isRequired,
 };
 
-// Create a UserStatsOverview component for regular users (without admin metrics)
 export const UserStatsOverview = () => {
   return (
     <div className="mb-6">
-      {/* User-specific content can be added here if needed */}
-      <div className="bg-blue-900/20 border border-blue-800 rounded-lg p-4">
+      <div className="bg-gradient-to-br from-brand-900/30 to-indigo-900/20 border border-brand-800/40 rounded-xl p-5 shadow-md">
         <h2 className="text-lg font-semibold text-white mb-2">Your Activity</h2>
-        <p className="text-gray-400 mb-2">
+        <p className="text-gray-400 text-sm mb-4">
           Use the links in the sidebar to access your watch history and liked videos.
         </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
-          <Link to="/dashboard/history" className="inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg bg-gray-700 hover:bg-gray-600 text-white">
-            <Clock className="mr-2 h-4 w-4" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Link to="/dashboard/history" className="inline-flex items-center px-4 py-2.5 text-sm font-medium rounded-lg bg-surface-600 hover:bg-surface-500 text-white transition-all duration-200 hover:-translate-y-0.5">
+            <Clock className="mr-2 h-4 w-4 text-brand-400" />
             View Watch History
           </Link>
-          <Link to="/dashboard/liked-videos" className="inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg bg-gray-700 hover:bg-gray-600 text-white">
-            <ThumbsUp className="mr-2 h-4 w-4" />
+          <Link to="/dashboard/liked-videos" className="inline-flex items-center px-4 py-2.5 text-sm font-medium rounded-lg bg-surface-600 hover:bg-surface-500 text-white transition-all duration-200 hover:-translate-y-0.5">
+            <ThumbsUp className="mr-2 h-4 w-4 text-purple-400" />
             View Liked Videos
           </Link>
         </div>

@@ -2,13 +2,13 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import PropTypes from 'prop-types';
 import { 
-  HiSearch, 
-  HiX, 
-  HiOutlineClock, 
-  HiTrendingUp, 
-  HiOutlineArrowUp,
-  HiTag
-} from "react-icons/hi";
+  Search, 
+  X, 
+  Clock, 
+  TrendingUp, 
+  ArrowUp,
+  Tag
+} from "lucide-react";
 import VideoService from "../../../utils/VideoService";
 import ApiService from "../../../utils/ApiService";
 
@@ -105,10 +105,8 @@ const SearchBar = ({
     setIsCategoriesLoading(true);
     
     try {
-      // First try to get personalized recommendations
       const recommendationsResponse = await ApiService.get('recommendations/?limit=5');
       
-      // Extract unique categories from recommended videos
       const categories = new Set();
       if (Array.isArray(recommendationsResponse)) {
         recommendationsResponse.forEach(video => {
@@ -118,7 +116,6 @@ const SearchBar = ({
         });
       }
       
-      // If we have fewer than 3 recommended categories, fetch trending videos for more categories
       if (categories.size < 3) {
         const trendingResponse = await ApiService.get('trending-videos/?limit=10');
         if (Array.isArray(trendingResponse)) {
@@ -130,7 +127,6 @@ const SearchBar = ({
         }
       }
       
-      // If we still need more categories, get from recent videos
       if (categories.size < MAX_CATEGORY_TILES) {
         const recentResponse = await ApiService.get('recent-videos/?limit=10');
         if (Array.isArray(recentResponse)) {
@@ -142,12 +138,10 @@ const SearchBar = ({
         }
       }
       
-      // Convert set to array and take up to MAX_CATEGORY_TILES elements
       setRecommendedCategories(Array.from(categories).slice(0, MAX_CATEGORY_TILES));
       
     } catch (e) {
       console.error("Error fetching recommended categories:", e);
-      // Fallback to default categories
       setRecommendedCategories(["Entertainment", "Education", "Sports", "Music", "Technology", "Comedy"]);
     } finally {
       setIsCategoriesLoading(false);
@@ -158,7 +152,6 @@ const SearchBar = ({
     setIsLoading(true);
     
     try {
-   
       const allVideos = await Promise.resolve(VideoService.getVideoFeed());
       
       if (Array.isArray(allVideos)) {
@@ -202,42 +195,34 @@ const SearchBar = ({
     
     const matchScores = [];
     
-    // Score title matches
     terms.titles.forEach(title => {
       const score = scoreMatches(title, queryLower, 100);
       if (score > 0) matchScores.push({ text: title, score });
     });
     
-    // Score category matches
     terms.categories.forEach(category => {
       const score = scoreMatches(category, queryLower, 60);
       if (score > 0) matchScores.push({ text: category, score });
     });
     
-    // Score uploader matches
     terms.uploaders.forEach(uploader => {
       const score = scoreMatches(uploader, queryLower, 50);
       if (score > 0) matchScores.push({ text: uploader, score });
     });
     
-    // Process partial matches for longer queries
     if (queryTerms.length > 0) {
       processPartialMatches(terms.titles, queryTerms, matchScores);
     }
     
-    // Deduplicate matches
     const uniqueMatches = deduplicateSuggestions(matchScores);
     
-    // Sort matches by score (fixed Sonar issue by moving sort to separate statement)
     const sortedMatches = [...uniqueMatches].sort((a, b) => b.score - a.score);
     
-    // Return only the top suggestions
     return sortedMatches
       .slice(0, MAX_SUGGESTIONS)
       .map(item => item.text);
   };
   
-  // Fixed cognitive complexity by breaking down the function
   const processPartialMatches = (terms, queryTerms, results) => {
     terms.forEach(term => {
       const words = term.split(/\s+/);
@@ -335,7 +320,7 @@ const SearchBar = ({
     
     return (
       <div 
-        className="absolute z-50 mt-2 w-full bg-gray-800 rounded-lg shadow-xl border border-gray-700 py-2 max-h-96 overflow-y-auto"
+        className="absolute z-50 mt-2 w-full bg-elevated rounded-lg shadow-xl border border-elevated-border py-2 max-h-96 overflow-y-auto"
         ref={suggestionBoxRef}
       >
         {isLoading && (
@@ -344,18 +329,17 @@ const SearchBar = ({
           </div>
         )}
         
-        {/* Search History */}
         {!isLoading && searchHistory.length > 0 && !searchQuery && (
           <div className="mb-2">
             <div className="px-4 py-1 text-xs text-gray-500">Recent searches</div>
             {searchHistory.map((item) => (
               <button
                 key={`history-item-${item.replace(/\s+/g, '-')}`}
-                className="w-full px-4 py-2 hover:bg-gray-700 cursor-pointer flex items-center justify-between text-gray-300 hover:text-white transition-colors text-left"
+                className="w-full px-4 py-2 hover:bg-surface-600 cursor-pointer flex items-center justify-between text-gray-300 hover:text-white transition-colors text-left"
                 onClick={() => handleSuggestionClick(item)}
               >
                 <div className="flex items-center">
-                  <HiOutlineClock className="mr-3 w-4 h-4 text-gray-500" />
+                  <Clock className="mr-3 w-4 h-4 text-gray-500" />
                   <span>{item}</span>
                 </div>
                 <button 
@@ -364,51 +348,48 @@ const SearchBar = ({
                     setSearchQuery(item);
                     searchRef.current?.focus();
                   }}
-                  className="text-blue-500 hover:text-blue-400"
+                  className="text-brand-400 hover:text-brand-300"
                   aria-label="Use this search term"
                 >
-                  <HiOutlineArrowUp className="w-4 h-4 transform rotate-45" />
+                  <ArrowUp className="w-4 h-4 transform rotate-45" />
                 </button>
               </button>
             ))}
-            <div className="border-t border-gray-700 my-1"></div>
+            <div className="border-t border-elevated-border my-1"></div>
           </div>
         )}
 
-        {/* Suggestions */}
         {!isLoading && suggestions.length > 0 && (
           <div className="mb-2">
             {suggestions.map((suggestion) => (
               <button
                 key={`suggestion-item-${suggestion.replace(/\s+/g, '-')}`}
-                className="w-full px-4 py-2 hover:bg-gray-700 cursor-pointer flex items-center text-gray-300 hover:text-white transition-colors text-left"
+                className="w-full px-4 py-2 hover:bg-surface-600 cursor-pointer flex items-center text-gray-300 hover:text-white transition-colors text-left"
                 onClick={() => handleSuggestionClick(suggestion)}
               >
-                <HiSearch className="mr-3 w-4 h-4 text-gray-500" />
+                <Search className="mr-3 w-4 h-4 text-gray-500" />
                 <span>{suggestion}</span>
               </button>
             ))}
           </div>
         )}
 
-        {/* Trending */}
         {!isLoading && showTrending && !searchQuery && trendingSearches.length > 0 && (
           <div>
             <div className="px-4 py-1 text-xs text-gray-500">Trending</div>
             {trendingSearches.map((trend) => (
               <button
                 key={`trend-item-${trend.replace(/\s+/g, '-')}`}
-                className="w-full px-4 py-2 hover:bg-gray-700 cursor-pointer flex items-center text-gray-300 hover:text-white transition-colors text-left"
+                className="w-full px-4 py-2 hover:bg-surface-600 cursor-pointer flex items-center text-gray-300 hover:text-white transition-colors text-left"
                 onClick={() => handleSuggestionClick(trend)}
               >
-                <HiTrendingUp className="mr-3 w-4 h-4 text-gray-500" />
+                <TrendingUp className="mr-3 w-4 h-4 text-gray-500" />
                 <span>{trend}</span>
               </button>
             ))}
           </div>
         )}
         
-        {/* No suggestions */}
         {!isLoading && searchQuery && suggestions.length === 0 && (
           <div className="px-4 py-3 text-gray-400 text-center">
             No matching suggestions
@@ -433,10 +414,10 @@ const SearchBar = ({
           {recommendedCategories.map((category) => (
             <button
               key={`category-${category.replace(/\s+/g, '-')}`}
-              className="px-4 py-2 bg-gray-700 hover:bg-blue-600 rounded-full text-sm text-gray-200 transition-colors duration-300 flex items-center"
+              className="px-4 py-2 bg-surface-600 hover:bg-brand-600 rounded-full text-sm text-gray-200 transition-colors duration-300 flex items-center"
               onClick={() => navigateToCategory(category)}
             >
-              <HiTag className="mr-1 w-4 h-4" />
+              <Tag className="mr-1 w-4 h-4" />
               {category}
             </button>
           ))}
@@ -454,15 +435,15 @@ const SearchBar = ({
       >
         <div className="relative">
           <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-            <HiSearch className="w-5 h-5 text-gray-400" />
+            <Search className="w-5 h-5 text-gray-400" />
           </div>
           
           <input
-            type="search"
+            type="text" role="searchbox"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={placeholder}
-            className="w-full py-2 pl-10 pr-10 bg-gray-800/70 border border-gray-700 focus:border-blue-500 rounded-full text-white placeholder-gray-400 outline-none transition-all duration-300 focus:ring-2 focus:ring-blue-500/50 shadow-lg"
+            className="w-full py-2 pl-10 pr-10 bg-elevated border border-elevated-border focus:border-brand-500 rounded-full text-white placeholder-gray-400 outline-none transition-all duration-300 focus:ring-2 focus:ring-brand-500/50 shadow-lg"
             onFocus={() => {
               setIsSearchFocused(true);
               setShowSuggestions(true);
@@ -478,7 +459,7 @@ const SearchBar = ({
                 className="text-gray-400 hover:text-white transition-colors mr-1"
                 aria-label="Clear search"
               >
-                <HiX className="w-5 h-5" />
+                <X className="w-5 h-5" />
               </button>
               
             </div>
@@ -488,7 +469,6 @@ const SearchBar = ({
 
       {renderSuggestionsList()}
       
-      {/* Category Tiles */}
       {showCategoryTiles && renderCategoryTiles()}
     </div>
   );

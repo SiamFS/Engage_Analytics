@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Card, Table, Button, Spinner, Alert, Modal } from 'flowbite-react';
-import { Trash, Edit, Eye } from 'lucide-react';
+import { Spinner, Alert, Modal } from 'flowbite-react';
+import { Trash, Edit, Eye, Film } from 'lucide-react';
 import VideoService from '../../../../utils/VideoService';
 import { useNavigate } from 'react-router-dom';
+import getPlaceholderImage from '../../../../utils/getPlaceholderImage';
 
 const AdminVideos = () => {
   const [allVideos, setAllVideos] = useState([]);
@@ -15,21 +16,10 @@ const AdminVideos = () => {
   
   const navigate = useNavigate();
   const isMounted = useRef(true);
-  const [ setIsMobile] = useState(window.innerWidth < 768);
 
   useEffect(() => {
     isMounted.current = true;
-    
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    window.addEventListener('resize', handleResize);
-    
-    return () => {
-      isMounted.current = false;
-      window.removeEventListener('resize', handleResize);
-    };
+    return () => { isMounted.current = false; };
   }, []);
 
   useEffect(() => {
@@ -41,11 +31,9 @@ const AdminVideos = () => {
         setError(null);
         setFetchAttempted(true);
         
-        // For mobile devices, limit the videos to reduce loading time
         const response = await Promise.resolve(VideoService.adminGetAllVideos());
         
         if (isMounted.current) {
-          // Sort videos by upload date to show newest first
           const sortedVideos = response ? 
             [...response].sort((a, b) => new Date(b.upload_date) - new Date(a.upload_date)) : 
             [];
@@ -57,9 +45,7 @@ const AdminVideos = () => {
           setError('Failed to load videos. Please try again.');
         }
       } finally {
-        if (isMounted.current) {
-          setLoading(false);
-        }
+        if (isMounted.current) { setLoading(false); }
       }
     };
 
@@ -101,118 +87,133 @@ const AdminVideos = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-white mb-6">Video Management</h1>
+      <div className="flex items-center gap-3 mb-2">
+        <div className="p-2 rounded-lg bg-brand-600/20">
+          <Film size={20} className="text-brand-400" />
+        </div>
+        <h1 className="text-2xl font-bold text-white">Video Management</h1>
+      </div>
       
-      <Card className="bg-gray-800 border-gray-700">
-        <h2 className="text-xl font-bold text-white mb-4">All Videos</h2>
+      <div className="card-base bg-elevated border-elevated-border p-5">
+        <h2 className="text-lg font-semibold text-white mb-5">All Videos</h2>
         
         {error && (
-          <Alert color="failure" onDismiss={() => setError(null)} className="mb-4">
+          <Alert color="failure" onDismiss={() => setError(null)} className="mb-4 rounded-lg border border-red-800/40">
             {error}
           </Alert>
         )}
         
         {success && (
-          <Alert color="success" onDismiss={() => setSuccess(null)} className="mb-4">
+          <Alert color="success" onDismiss={() => setSuccess(null)} className="mb-4 rounded-lg border border-green-800/40">
             {success}
           </Alert>
         )}
         
         {loading ? (
-          <div className="flex justify-center items-center py-8">
-            <Spinner size="xl" />
+          <div className="flex justify-center items-center py-12">
+            <Spinner size="xl" className="fill-brand-500" />
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <Table hoverable className="bg-gray-700 text-white">
-              <Table.Head>
-                <Table.HeadCell>Thumbnail</Table.HeadCell>
-                <Table.HeadCell>Title</Table.HeadCell>
-                <Table.HeadCell>Uploader</Table.HeadCell>
-                <Table.HeadCell>Visibility</Table.HeadCell>
-                <Table.HeadCell>Upload Date</Table.HeadCell>
-                <Table.HeadCell>Views</Table.HeadCell>
-                <Table.HeadCell>Actions</Table.HeadCell>
-              </Table.Head>
-              <Table.Body className="divide-y divide-gray-600">
+          <div className="overflow-x-auto -mx-5">
+            <table className="w-full text-sm text-left">
+              <thead>
+                <tr className="border-b border-elevated-border">
+                  <th className="px-5 py-3 text-gray-400 font-medium text-xs uppercase tracking-wider">Thumbnail</th>
+                  <th className="px-5 py-3 text-gray-400 font-medium text-xs uppercase tracking-wider">Title</th>
+                  <th className="px-5 py-3 text-gray-400 font-medium text-xs uppercase tracking-wider hidden md:table-cell">Uploader</th>
+                  <th className="px-5 py-3 text-gray-400 font-medium text-xs uppercase tracking-wider hidden sm:table-cell">Visibility</th>
+                  <th className="px-5 py-3 text-gray-400 font-medium text-xs uppercase tracking-wider hidden lg:table-cell">Date</th>
+                  <th className="px-5 py-3 text-gray-400 font-medium text-xs uppercase tracking-wider hidden sm:table-cell">Views</th>
+                  <th className="px-5 py-3 text-gray-400 font-medium text-xs uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-elevated-border">
                 {allVideos.length === 0 ? (
-                  <Table.Row className="bg-gray-700">
-                    <Table.Cell colSpan={7} className="text-center py-10">
+                  <tr>
+                    <td colSpan={7} className="px-5 py-12 text-center text-gray-500">
+                      <Film size={32} className="mx-auto mb-2 text-gray-600" />
                       No videos found
-                    </Table.Cell>
-                  </Table.Row>
+                    </td>
+                  </tr>
                 ) : (
                   allVideos.map(video => (
-                    <Table.Row key={video.id} className="bg-gray-700 hover:bg-gray-600">
-                      <Table.Cell>
+                    <tr key={video.id} className="hover:bg-surface-600 transition-colors">
+                      <td className="px-5 py-3">
                         <img 
-                          src={video.thumbnail_url || '/api/placeholder/80/45'} 
+                          src={video.thumbnail_url || getPlaceholderImage(80, 45, video.title)} 
                           alt={video.title}
                           loading="lazy"
-                          className="w-20 h-12 object-cover rounded"
+                          className="w-16 h-10 object-cover rounded-lg border border-elevated-border"
                         />
-                      </Table.Cell>
-                      <Table.Cell className="whitespace-nowrap font-medium">
+                      </td>
+                      <td className="px-5 py-3 text-white font-medium truncate max-w-[200px]">
                         {video.title}
-                      </Table.Cell>
-                      <Table.Cell>
+                      </td>
+                      <td className="px-5 py-3 text-gray-400 hidden md:table-cell">
                         {video.uploader?.email || 'Unknown'}
-                      </Table.Cell>
-                      <Table.Cell>
-                        <span className="capitalize">{video.visibility}</span>
-                      </Table.Cell>
-                      <Table.Cell>
+                      </td>
+                      <td className="px-5 py-3 hidden sm:table-cell">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                          video.visibility === 'public' 
+                            ? 'bg-green-600/20 text-green-300' 
+                            : 'bg-surface-600 text-gray-400'
+                        }`}>
+                          {video.visibility}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-gray-400 hidden lg:table-cell">
                         {new Date(video.upload_date).toLocaleDateString()}
-                      </Table.Cell>
-                      <Table.Cell>
+                      </td>
+                      <td className="px-5 py-3 text-gray-400 hidden sm:table-cell">
                         {video.views || 0}
-                      </Table.Cell>
-                      <Table.Cell>
-                        <div className="flex space-x-2">
-                          <Button size="xs" color="blue" onClick={() => handleViewVideo(video.id)}>
+                      </td>
+                      <td className="px-5 py-3">
+                        <div className="flex gap-1.5">
+                          <button onClick={() => handleViewVideo(video.id)} className="p-1.5 rounded-lg bg-brand-600/20 text-brand-300 hover:bg-brand-600/30 transition-colors" title="View" type="button">
                             <Eye size={14} />
-                          </Button>
-                          <Button size="xs" color="gray" onClick={() => navigate(`/dashboard/edit-video/${video.id}`)}>
+                          </button>
+                          <button onClick={() => navigate(`/dashboard/edit-video/${video.id}`)} className="p-1.5 rounded-lg bg-surface-600 text-gray-300 hover:bg-surface-500 transition-colors" title="Edit" type="button">
                             <Edit size={14} />
-                          </Button>
-                          <Button size="xs" color="failure" onClick={() => openDeleteModal(video.id)}>
+                          </button>
+                          <button onClick={() => openDeleteModal(video.id)} className="p-1.5 rounded-lg bg-red-600/20 text-red-300 hover:bg-red-600/30 transition-colors" title="Delete" type="button">
                             <Trash size={14} />
-                          </Button>
+                          </button>
                         </div>
-                      </Table.Cell>
-                    </Table.Row>
+                      </td>
+                    </tr>
                   ))
                 )}
-              </Table.Body>
-            </Table>
+              </tbody>
+            </table>
           </div>
         )}
-      </Card>
+      </div>
       
-      {/* Delete Video Confirmation Modal */}
-      <Modal show={deleteModalOpen} onClose={() => setDeleteModalOpen(false)}>
-        <Modal.Header className="bg-gray-800 text-white border-b border-gray-700">
-          Delete Video
+      <Modal show={deleteModalOpen} onClose={() => setDeleteModalOpen(false)} theme={{ content: { inner: 'relative flex max-h-[90dvh] flex-col rounded-lg bg-elevated shadow' } }}>
+        <Modal.Header className="bg-elevated text-white border-b border-elevated-border rounded-t-xl">
+          <span className="text-white">Delete Video</span>
         </Modal.Header>
-        <Modal.Body className="bg-gray-800 text-white">
+        <Modal.Body className="bg-elevated text-white">
           <p className="mb-2">Are you sure you want to delete this video?</p>
-          <p className="text-red-400">This action cannot be undone.</p>
+          <p className="text-red-400 text-sm">This action cannot be undone.</p>
         </Modal.Body>
-        <Modal.Footer className="bg-gray-800 border-t border-gray-700">
-          <Button
-            color="failure"
+        <Modal.Footer className="bg-elevated border-t border-elevated-border">
+          <button
             onClick={handleDeleteVideo}
             disabled={loading}
+            className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50"
+            type="button"
           >
-            {loading && <Spinner size="sm" className="mr-2" />}
+            {loading && <Spinner size="sm" className="mr-2 inline" />}
             Delete Video
-          </Button>
-          <Button
-            color="gray"
+          </button>
+          <button
             onClick={() => setDeleteModalOpen(false)}
+            className="px-4 py-2 text-sm font-medium text-gray-300 bg-surface-600 hover:bg-surface-500 rounded-lg transition-colors"
+            type="button"
           >
             Cancel
-          </Button>
+          </button>
         </Modal.Footer>
       </Modal>
     </div>

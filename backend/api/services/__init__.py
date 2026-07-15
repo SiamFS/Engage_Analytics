@@ -6,3 +6,5 @@ from api.services.azure_storage_service import AzureStorageService
 from api.services.video_upload_service import VideoUploadService
 from api.services.webcam_upload_service import WebcamUploadService
 from api.services.emotion_analysis_service import EmotionAnalysisService
+from api.services.notification_service import NotificationService
+from api.services.feedback_service import FeedbackService

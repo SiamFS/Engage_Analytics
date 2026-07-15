@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Clock, TrendingUp, ThumbsUp } from 'lucide-react';
+import React, { useState, useEffect, useContext } from 'react';
+import { Clock, TrendingUp, ThumbsUp, Star } from 'lucide-react';
 import ApiService from '../../../utils/ApiService';
+import { AuthContext } from '../../../contexts/AuthProvider/AuthProvider';
 import { 
   LoadingState, 
   ErrorState, 
@@ -10,12 +11,22 @@ import HeroBillboard from '../HeroBillboard/HeroBillboard';
 import AdRow from '../AdRow/AdRow';
 
 const LoggedInView = () => {
+  const { user } = useContext(AuthContext);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [featuredVideos, setFeaturedVideos] = useState([]);
   const [recentVideos, setRecentVideos] = useState([]);
   const [popularVideos, setPopularVideos] = useState([]);
   const [recommendedVideos, setRecommendedVideos] = useState([]);
+  const [pointsData, setPointsData] = useState(null);
+  
+  useEffect(() => {
+    if (user?.role === 'user') {
+      ApiService.get('user/points/').then(res => {
+        if (res?.points !== undefined) setPointsData(res);
+      }).catch(() => {});
+    }
+  }, [user]);
   
   useEffect(() => {
     const loadVideos = async () => {
@@ -23,7 +34,6 @@ const LoggedInView = () => {
         setLoading(true);
         setError(null);
         
-        // Use Promise.allSettled to handle multiple requests without failing if one fails
         const [featuredResponse, recentResponse, trendingResponse, recommendedResponse] = 
           await Promise.allSettled([
             ApiService.get('featured-carousel/?limit=5'),
@@ -79,7 +89,6 @@ const LoggedInView = () => {
     return <ErrorState error={error} onDismiss={() => setError(null)} />;
   }
   
-  // Show empty state if no videos at all
   if (
     !featuredVideos.length && 
     !recentVideos.length && 
@@ -94,10 +103,22 @@ const LoggedInView = () => {
   }
   
   return (
-    <div className="bg-gray-900 px-4 py-6 md:px-8 md:py-10 min-h-screen">
+    <div className="bg-surface px-4 py-6 md:px-8 md:py-10 min-h-screen">
       {featuredVideos && featuredVideos.length > 0 && (
-        <div className="mb-10 transform transition-transform duration-700 hover:scale-[1.01]">
+        <div>
           <HeroBillboard videos={featuredVideos} />
+        </div>
+      )}
+
+      {pointsData && pointsData.points > 0 && (
+        <div className="mb-8 inline-flex items-center gap-2 bg-gradient-to-r from-yellow-500/10 to-yellow-600/5 border border-yellow-500/20 rounded-xl px-4 py-2.5">
+          <Star size={16} className="text-yellow-400 fill-yellow-400" />
+          <span className="text-yellow-200 text-sm">
+            You have <span className="text-yellow-400 font-bold">{pointsData.points} points</span>
+            {pointsData.points_value > 0 && (
+              <span> — worth <span className="text-green-400 font-bold">{pointsData.points_value} BDT</span></span>
+            )}
+          </span>
         </div>
       )}
       
@@ -115,7 +136,7 @@ const LoggedInView = () => {
         {recentVideos && recentVideos.length > 0 && (
           <AdRow 
             title="Recently Added" 
-            icon={<Clock size={24} className="text-blue-400" />}
+            icon={<Clock size={24} className="text-brand-400" />}
             ads={recentVideos}
             linkTo="/videos?sort=newest"
             isVideoSection={true}
