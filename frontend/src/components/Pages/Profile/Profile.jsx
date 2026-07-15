@@ -8,7 +8,7 @@ import { Button, Card, Label, TextInput, Spinner, Toast } from 'flowbite-react';
 import { Camera, Upload, X, User, Mail, Image, Check, AlertTriangle } from 'lucide-react';
 import TokenService from '../../../utils/TokenService';
 
-const DEFAULT_AVATAR = "https://flowbite.com/docs/images/people/profile-picture-5.jpg";
+const DEFAULT_AVATAR = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-7 8-7s8 3 8 7"/></svg>');
 const IMGBB_API_KEY = import.meta.env.VITE_IMGBB_API_KEY;
 
 const ProfileAvatar = ({ 
