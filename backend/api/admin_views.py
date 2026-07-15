@@ -461,14 +461,31 @@ class AdminUserManagementView(APIView):
 
         try:
             from firebase_admin import auth as firebase_auth
+            from firebase_admin import firestore as _fs
+
+            email = serializer.validated_data.get("email")
+            password = serializer.validated_data.get("password") or ""
+            first_name = serializer.validated_data.get("first_name", "")
+            last_name = serializer.validated_data.get("last_name", "")
+            role = serializer.validated_data.get("role", "user")
+
             fb_user = firebase_auth.create_user(
-                email=serializer.validated_data.get("email"),
-                password=serializer.validated_data.get("password") or "",
-                display_name=f"{serializer.validated_data.get('first_name', '')} {serializer.validated_data.get('last_name', '')}".strip(),
+                email=email,
+                password=password,
+                display_name=f"{first_name} {last_name}".strip(),
+                email_verified=True,
             )
             serializer.validated_data["firebase_uid"] = fb_user.uid
-        except (ImportError, ValueError) as e:
-            logger.warning(f"Firebase user creation skipped: {e}")
+
+            _fs.client().collection("users").document(fb_user.uid).set({
+                "firstName": first_name,
+                "lastName": last_name,
+                "email": email,
+                "role": role,
+                "createdAt": _fs.SERVER_TIMESTAMP,
+            })
+        except ImportError:
+            logger.warning("Firebase Admin SDK not available, creating Django user only")
         except Exception as e:
             logger.error(f"Failed to create Firebase user: {e}")
             return Response(

@@ -100,7 +100,7 @@ const Login = () => {
           <div className="mt-3 p-3 bg-surface-600 border border-elevated-border rounded-lg text-xs space-y-1.5">
             <div className="flex items-center gap-2">
               <span className="text-gray-500 w-16 shrink-0">Email</span>
-              <code className="text-gray-200 select-all bg-surface px-2 py-0.5 rounded text-xs break-all">testadmin@gmail.com</code>
+              <code className="text-gray-200 select-all bg-surface px-2 py-0.5 rounded text-xs break-all">siamferdoustest@gmail.com</code>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-gray-500 w-16 shrink-0">Password</span>
