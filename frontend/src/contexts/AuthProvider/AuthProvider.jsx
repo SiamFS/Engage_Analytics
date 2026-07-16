@@ -26,7 +26,7 @@ const DEFAULT_AVATAR = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="h
 
 const getUserDevicesFromApi = async () => {
   try {
-    const response = await ApiService.get('/api/user/devices/');
+    const response = await ApiService.get('/user/devices/');
     return response || [];
   } catch {
     return [];
@@ -35,7 +35,7 @@ const getUserDevicesFromApi = async () => {
 
 const addDeviceToApi = async (deviceId, deviceName) => {
   try {
-    await ApiService.post('/api/user/devices/', { id: deviceId, name: deviceName });
+    await ApiService.post('/user/devices/', { id: deviceId, name: deviceName });
   } catch (error) {
     if (error.message && error.message.includes('device limit')) {
       const limitError = new Error('Maximum device limit reached (5). Please remove a device first.');
@@ -48,7 +48,7 @@ const addDeviceToApi = async (deviceId, deviceName) => {
 
 const removeDeviceFromApi = async (deviceId) => {
   try {
-    await ApiService.delete(`/api/user/devices/?device_id=${encodeURIComponent(deviceId)}`);
+    await ApiService.delete(`/user/devices/?device_id=${encodeURIComponent(deviceId)}`);
   } catch {
     // Silently ignore
   }
@@ -451,7 +451,7 @@ const AuthProvider = ({ children }) => {
         }
 
         try {
-          const profile = await ApiService.get('/api/user/profile/');
+          const profile = await ApiService.get('/user/profile/');
           return {
             role: profile.role,
             firstName: profile.first_name,

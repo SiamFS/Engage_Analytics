@@ -415,7 +415,7 @@ const useProfileData = (user) => {
     if (!user?.uid) return null;
 
     try {
-      const profile = await ApiService.get('/api/user/profile/');
+      const profile = await ApiService.get('/user/profile/');
 
       setFormState({
         firstName: profile.first_name || '',
@@ -475,7 +475,7 @@ const useProfileActions = (user, formState, setLastUpdateTime, showToast, resetD
     const { firstName, lastName, photoURL } = formState;
     const currentTime = new Date();
 
-    await ApiService.patch('/api/user/profile/', {
+    await ApiService.patch('/user/profile/', {
       first_name: firstName,
       last_name: lastName,
       photo_url: photoURL,
