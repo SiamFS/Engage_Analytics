@@ -25,6 +25,8 @@ from api.views import (
     VideoEmotionRecordingsView,
     MyEmotionView,
     UserWebcamRecordingsView,
+    UserProfileView,
+    UserDeviceView,
     HealthCheckView,
     UploadRequestListCreateView,
     UploadRequestDetailView,
@@ -114,6 +116,8 @@ urlpatterns = [
     path("user/history/", UserHistoryAPI.as_view(), name="user-history"),
     path("user/liked/", UserLikedVideosAPI.as_view(), name="user-liked-videos"),
     path("user/points/", UserPointsView.as_view(), name="user-points"),
+    path("user/profile/", UserProfileView.as_view(), name="user-profile"),
+    path("user/devices/", UserDeviceView.as_view(), name="user-devices"),
     # Recommendation endpoints
     path(
         "recommendations/",

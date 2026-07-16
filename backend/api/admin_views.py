@@ -10,7 +10,6 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from firebase_admin import auth as firebase_auth
-from firebase_admin import firestore
 
 from api.models import User, Video, CompanyProfile, ViewerProfile, WebcamRecording, UploadRequest
 from django.db.models import Sum, Q
@@ -37,14 +36,6 @@ from api.services.upload_request_service import UploadRequestService
 from api.utils import safe_int_param
 
 logger = logging.getLogger(__name__)
-
-
-def _get_firestore_db():
-    try:
-        return firestore.client()
-    except Exception:
-        logger.exception("Failed to get Firestore client")
-        return None
 
 
 class UserSearchView(generics.GenericAPIView):
@@ -100,48 +91,38 @@ class PromoteToAdminView(generics.CreateAPIView):
             target_user.role = "admin"
             target_user.save()
 
-            # Update role in Firebase
-            try:
-                db = _get_firestore_db()
-                if db is None:
-                    raise Exception("Firestore client unavailable")
-                user_ref = db.collection("users").document(target_user.firebase_uid)
-                user_ref.update({"role": "admin"})
+            if old_role == "company":
+                CompanyProfile.objects.filter(user=target_user).delete()
+            elif old_role == "user":
+                ViewerProfile.objects.filter(user=target_user).delete()
 
-                if old_role == "company":
-                    CompanyProfile.objects.filter(user=target_user).delete()
-                elif old_role == "user":
-                    ViewerProfile.objects.filter(user=target_user).delete()
+            NotificationService.create_notification(
+                recipient=target_user,
+                notification_type="user_promoted",
+                title="You are now an admin!",
+                message=f"You have been promoted to admin by {request.user.get_full_name() or request.user.email}.",
+                data={"promoted_by": request.user.id},
+            )
 
-                NotificationService.create_notification(
-                    recipient=target_user,
-                    notification_type="user_promoted",
-                    title="You are now an admin!",
-                    message=f"You have been promoted to admin by {request.user.get_full_name() or request.user.email}.",
-                    data={"promoted_by": request.user.id},
-                )
-
-                return Response(
-                    {
-                        "message": f"Successfully promoted {target_user.email} to admin",
-                        "user": UserSerializer(target_user).data,
-                    }
-                )
-            except Exception as e:
-                logger.error(
-                    f"Failed to update Firebase for user {target_user.email}: {str(e)}",
-                    exc_info=True,
-                )
-                target_user.role = old_role
-                target_user.save()
-                return Response(
-                    {"error": "An internal error occurred while updating Firebase."},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
+            return Response(
+                {
+                    "message": f"Successfully promoted {target_user.email} to admin",
+                    "user": UserSerializer(target_user).data,
+                }
+            )
 
         except Exception as e:
+            error_str = str(e).lower()
+            if "firebase" in error_str or "auth" in error_str:
+                logger.error(f"Firebase auth error during promotion: {e}")
+                return Response(
+                    {"error": "Firebase authentication failed. Please try again."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            logger.exception(f"Unexpected error during promotion: {e}")
             return Response(
-                {"error": "Invalid credentials"}, status=status.HTTP_400_BAD_REQUEST
+                {"error": "An unexpected error occurred during promotion."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
 
@@ -471,31 +452,25 @@ class AdminUserManagementView(APIView):
 
         try:
             from firebase_admin import auth as firebase_auth
-            from firebase_admin import firestore as _fs
+        except ImportError:
+            logger.warning("Firebase Admin SDK not available, creating Django user only")
+            user = serializer.save()
+            result = UserManagementSerializer(user).data
+            return Response(result, status=status.HTTP_201_CREATED)
 
-            email = serializer.validated_data.get("email")
-            password = serializer.validated_data.get("password") or ""
-            first_name = serializer.validated_data.get("first_name", "")
-            last_name = serializer.validated_data.get("last_name", "")
-            role = serializer.validated_data.get("role", "user")
+        email = serializer.validated_data.get("email")
+        password = serializer.validated_data.get("password") or ""
+        first_name = serializer.validated_data.get("first_name", "")
+        last_name = serializer.validated_data.get("last_name", "")
+        role = serializer.validated_data.get("role", "user")
 
+        try:
             fb_user = firebase_auth.create_user(
                 email=email,
                 password=password,
                 display_name=f"{first_name} {last_name}".strip(),
                 email_verified=True,
             )
-            serializer.validated_data["firebase_uid"] = fb_user.uid
-
-            _fs.client().collection("users").document(fb_user.uid).set({
-                "firstName": first_name,
-                "lastName": last_name,
-                "email": email,
-                "role": role,
-                "createdAt": _fs.SERVER_TIMESTAMP,
-            })
-        except ImportError:
-            logger.warning("Firebase Admin SDK not available, creating Django user only")
         except Exception as e:
             logger.error(f"Failed to create Firebase user: {e}")
             return Response(
@@ -503,6 +478,7 @@ class AdminUserManagementView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        serializer.validated_data["firebase_uid"] = fb_user.uid
         user = serializer.save()
 
         NotificationService.create_notification(
@@ -531,6 +507,11 @@ class AdminUserDetailView(APIView):
         update_data = {k: v for k, v in request.data.items() if k in allowed_fields}
 
         if "role" in update_data:
+            if user.id == request.user.id and update_data["role"] != "admin":
+                return Response(
+                    {"error": "You cannot change your own role."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             old_role = user.role
             new_role = update_data["role"]
             if old_role == "company" and new_role != "company":
@@ -546,24 +527,22 @@ class AdminUserDetailView(APIView):
 
         serializer.save()
 
-        if "role" in update_data:
-            try:
-                from firebase_admin import firestore as _fs
-                _fs.client().collection('users').document(user.firebase_uid).update({'role': update_data["role"]})
-            except Exception:
-                logger.warning(f"Failed to sync role to Firestore for user {user.id}")
-
         return Response(serializer.data)
 
     def delete(self, request, user_id):
         user = get_object_or_404(User, id=user_id)
+        if user.id == request.user.id:
+            return Response(
+                {"error": "You cannot delete your own account."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         firebase_uid = user.firebase_uid
         user.delete()
         try:
             from firebase_admin import auth as firebase_auth
             firebase_auth.delete_user(firebase_uid)
         except Exception:
-            pass
+            logger.warning(f"Failed to delete Firebase user {firebase_uid}")
         return Response({"message": "User deleted successfully."}, status=status.HTTP_200_OK)
 
 
@@ -574,6 +553,11 @@ class AdminUserActivateView(APIView):
         user = get_object_or_404(User, id=user_id)
         user.is_active = True
         user.save(update_fields=["is_active"])
+        try:
+            from firebase_admin import auth as firebase_auth
+            firebase_auth.update_user(user.firebase_uid, disabled=False)
+        except Exception:
+            logger.warning(f"Failed to enable Firebase user {user.firebase_uid}")
         return Response({"message": "User activated successfully."})
 
 
@@ -582,8 +566,18 @@ class AdminUserDeactivateView(APIView):
 
     def post(self, request, user_id):
         user = get_object_or_404(User, id=user_id)
+        if user.id == request.user.id:
+            return Response(
+                {"error": "You cannot deactivate your own account."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         user.is_active = False
         user.save(update_fields=["is_active"])
+        try:
+            from firebase_admin import auth as firebase_auth
+            firebase_auth.update_user(user.firebase_uid, disabled=True)
+        except Exception:
+            logger.warning(f"Failed to disable Firebase user {user.firebase_uid}")
         return Response({"message": "User deactivated successfully."})
 
 
@@ -601,19 +595,36 @@ class AdminUserBulkActionView(APIView):
             )
 
         if action == "activate":
-            updated = User.objects.filter(id__in=user_ids).update(is_active=True)
-        elif action == "deactivate":
-            updated = User.objects.filter(id__in=user_ids).update(is_active=False)
-        elif action == "delete":
             users = User.objects.filter(id__in=user_ids)
+            count = users.update(is_active=True)
             for u in users:
                 try:
                     from firebase_admin import auth as firebase_auth
-                    firebase_auth.delete_user(u.firebase_uid)
+                    firebase_auth.update_user(u.firebase_uid, disabled=False)
                 except Exception:
                     pass
-            deleted, _ = users.delete()
-            updated = deleted
+            updated = count
+        elif action == "deactivate":
+            users = User.objects.filter(id__in=user_ids)
+            count = users.update(is_active=False)
+            for u in users:
+                try:
+                    from firebase_admin import auth as firebase_auth
+                    firebase_auth.update_user(u.firebase_uid, disabled=True)
+                except Exception:
+                    pass
+            updated = count
+        elif action == "delete":
+            users = User.objects.filter(id__in=user_ids)
+            firebase_uids = list(users.values_list("firebase_uid", flat=True))
+            updated = users.count()
+            users.delete()
+            for uid in firebase_uids:
+                try:
+                    from firebase_admin import auth as firebase_auth
+                    firebase_auth.delete_user(uid)
+                except Exception:
+                    pass
         else:
             return Response(
                 {"detail": f"Unknown action: {action}"},

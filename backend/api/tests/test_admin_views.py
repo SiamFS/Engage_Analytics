@@ -8,7 +8,7 @@ from api.models import (
     User, Video, CompanyProfile, ViewerProfile, WebcamRecording 
 )
 from django.utils import timezone
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 User = get_user_model()
 
@@ -276,60 +276,34 @@ class TestPromoteToAdminView:
     """Test the PromoteToAdminView admin API."""    
     
     @patch('api.admin_views.firebase_auth.get_user')
-    @patch('api.admin_views._get_firestore_db')
-    def test_promote_user_to_admin_success(self, mock_get_db, mock_get_user, admin_client, regular_user):
-        """Test successfully promoting a regular user to admin."""        
-        # Mock Firebase auth and db
+    def test_promote_user_to_admin_success(self, mock_get_user, admin_client, regular_user):
+        """Test successfully promoting a regular user to admin."""
         mock_get_user.return_value = {'uid': regular_user.firebase_uid}
-        
-        # Create mock for Firestore document
-        mock_document = MagicMock()
-        mock_collection = MagicMock()
-        mock_collection.document.return_value = mock_document
-        mock_db = MagicMock()
-        mock_db.collection.return_value = mock_collection
-        mock_get_db.return_value = mock_db
-        
+
         url = reverse('admin-promote-user')
         data = {
             'user_id': regular_user.id,
         }
-        
+
         response = admin_client.post(url, data, format='json')
-        
+
         assert response.status_code == status.HTTP_200_OK
         assert 'user' in response.data
         assert response.data['user']['role'] == 'admin'
         assert 'Successfully promoted' in response.data['message']
-        
-        # Verify user was updated in the database
+
         regular_user.refresh_from_db()
         assert regular_user.role == 'admin'
-        
-        # Verify Firebase was called correctly
+
         mock_get_user.assert_called_once()
-        mock_db.collection.assert_called_once_with('users')
-        mock_collection.document.assert_called_once_with(regular_user.firebase_uid)
-        mock_document.update.assert_called_once_with({'role': 'admin'})
-        
-        # Verify viewer profile was deleted
+
         assert not ViewerProfile.objects.filter(user=regular_user).exists()
-    
+
     @patch('api.admin_views.firebase_auth.get_user')
-    @patch('api.admin_views._get_firestore_db')
-    def test_promote_company_user_to_admin(self, mock_get_db, mock_get_user, admin_client, company_user):
-        """Test promoting a company user to admin."""        
-        # Mock Firebase auth and db
+    def test_promote_company_user_to_admin(self, mock_get_user, admin_client, company_user):
+        """Test promoting a company user to admin."""
         mock_get_user.return_value = {'uid': company_user.firebase_uid}
-        
-        # Create mock for Firestore document
-        mock_document = MagicMock()
-        mock_collection = MagicMock()
-        mock_collection.document.return_value = mock_document
-        mock_db = MagicMock()
-        mock_db.collection.return_value = mock_collection
-        mock_get_db.return_value = mock_db
-        
+
         url = reverse('admin-promote-user')
         data = {
             'user_id': company_user.id,
@@ -371,42 +345,9 @@ class TestPromoteToAdminView:
         response = admin_client.post(url, data, format='json')
         
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "Invalid credentials" in response.data['error']
+        assert "Firebase" in response.data['error']
         
         # Verify user role was not changed
-        regular_user.refresh_from_db()
-        assert regular_user.role == 'user'
-    
-    @patch('api.admin_views.firebase_auth.get_user')
-    @patch('api.admin_views._get_firestore_db')
-    def test_promote_user_firebase_db_failure(self, mock_get_db, mock_get_user, admin_client, regular_user):
-        """Test handling a Firebase Firestore database failure during promotion."""        
-        # Mock Firebase auth for the requesting admin
-        mock_get_user.return_value = {'uid': admin_client.handler._force_user.firebase_uid}
-
-        # Create mock for Firestore document that raises an exception when updated
-        mock_document = MagicMock()
-        mock_document.update.side_effect = Exception("Firestore error")
-
-        mock_collection = MagicMock()
-        mock_collection.document.return_value = mock_document
-
-        mock_db = MagicMock()
-        mock_db.collection.return_value = mock_collection
-        mock_get_db.return_value = mock_db
-
-        url = reverse('admin-promote-user')
-        data = {
-            'user_id': regular_user.id,
-        }
-
-        response = admin_client.post(url, data, format='json')
-
-        # Updated to match the actual error message pattern
-        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-        assert "An internal error occurred while updating Firebase" in response.data['error']
-
-        # Verify user role was rolled back in Django DB
         regular_user.refresh_from_db()
         assert regular_user.role == 'user'
     

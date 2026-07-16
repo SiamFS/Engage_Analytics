@@ -1,16 +1,27 @@
-import React from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { MotionConfig } from 'framer-motion';
 import NavigationBar from './components/Shared/Navbar/Navbar';
 import MainFooter from './components/Shared/Footer/Footer';
 import ScrollToTop from './components/Shared/ScrollToTop/ScrollToTop';
 import ErrorBoundary from './components/common/ErrorBoundary/ErrorBoundary';
+import SessionTimeoutHandler from './components/common/SessionTimeoutHandler/SessionTimeoutHandler';
+import ActivityTracker from './components/common/ActivityTracker/ActivityTracker';
 
 const AUTH_ROUTES = ['/login', '/signup', '/forgetpassword'];
 
 function App() {
   const location = useLocation();
+  const navigate = useNavigate();
   const isAuthPage = AUTH_ROUTES.includes(location.pathname);
+
+  useEffect(() => {
+    const handleAuthError = () => {
+      navigate('/login', { replace: true });
+    };
+    window.addEventListener('auth_error', handleAuthError);
+    return () => window.removeEventListener('auth_error', handleAuthError);
+  }, [navigate]);
 
   return (
     <MotionConfig reducedMotion="user">
@@ -23,6 +34,8 @@ function App() {
           </ErrorBoundary>
         </main>
         {!isAuthPage && <MainFooter />}
+        <SessionTimeoutHandler />
+        <ActivityTracker />
       </div>
     </MotionConfig>
   );

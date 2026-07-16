@@ -118,8 +118,8 @@ export const useLoginForm = () => {
   const { navigateAfterAuth } = useAuthNavigation();
 
   const handleLoginError = useCallback((error) => {
-    if (error.message === 'EMAIL_NOT_VERIFIED') {
-      setAuthError('Please verify your email before logging in');
+    if (error.code === 'EMAIL_NOT_VERIFIED') {
+      setAuthError('Please verify your email before logging in. Check your inbox and spam folder for the verification link.');
     } else if (error.message === 'MAX_DEVICES_REACHED' || error.code === 'MAX_DEVICES_REACHED') {
       setAuthError(`You've reached the maximum device limit (${maxDevices}). Please log out from another device to continue.`);
     } else {

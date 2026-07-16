@@ -1,13 +1,12 @@
 const TokenService = {
   tokenKey: 'auth_token',
-  userDevicesKey: 'user_devices',
   currentDeviceKey: 'current_device_id',
   tokenExpiryKey: 'auth_token_expiry',
   googleAuthCacheKey: 'google_auth_cache',
   profileUpdateTimeKey: 'profile_last_update_time',
   lastTokenSetTimeKey: 'last_token_set_time',
 
-  sessionDuration: 50 * 60 * 1000, // 50 minutes (Firebase tokens expire in 1 hour)
+  sessionDuration: 7 * 24 * 60 * 60 * 1000, // 7 days
   tokenRateLimitMs: 1000, //1sec
 
   maxDevices: 5,
@@ -197,102 +196,6 @@ const TokenService = {
   },
 
   /**
-   * Handle device tracking for a user
-   * @param {string} uid - The user's ID
-   * @returns {boolean} Success status of the operation
-   */
-  handleDeviceTracking(uid) {
-    try {
-      if (!uid) return false;
-
-      const deviceId = this.getCurrentDeviceId();
-      let userDevices = this.getUserDevices(uid);
-
-      const existingDeviceIndex = userDevices.findIndex(device => device.id === deviceId);
-      if (existingDeviceIndex >= 0) {
-        userDevices[existingDeviceIndex].lastActive = new Date().toISOString();
-        this.storeUserDevices(uid, userDevices);
-        return true;
-      }
-
-      if (userDevices.length >= this.maxDevices) {
-        console.warn('Maximum devices reached');
-        return false;
-      }
-
-      userDevices.push({
-        id: deviceId,
-        name: this.getDeviceName(),
-        lastActive: new Date().toISOString()
-      });
-
-      this.storeUserDevices(uid, userDevices);
-      return true;
-    } catch (error) {
-      console.error('Error handling device tracking:', error);
-      return false;
-    }
-  },
-
-  /**
-   * Store user devices in local storage
-   * @param {string} uid - The user's ID
-   * @param {Array} devices - Array of device objects
-   */
-  storeUserDevices(uid, devices) {
-    try {
-      this._storage.setItem(this.userDevicesKey, JSON.stringify({
-        uid,
-        devices
-      }));
-    } catch (error) {
-      console.error('Error storing user devices:', error);
-    }
-  },
-
-  /**
-   * Get all devices for a user
-   * @param {string} uid - The user's ID
-   * @returns {Array} Array of devices
-   */
-  getUserDevices(uid) {
-    try {
-      if (!uid) return [];
-
-      const storedData = this._storage.getItem(this.userDevicesKey);
-      if (!storedData) return [];
-
-      try {
-        const parsed = JSON.parse(storedData);
-        return (parsed.uid === uid) ? (parsed.devices || []) : [];
-      } catch (parseError) {
-        console.error('Error parsing user devices JSON:', parseError);
-        return [];
-      }
-    } catch (error) {
-      console.error('Error retrieving user devices:', error);
-      return [];
-    }
-  },
-
-  /**
-   * Remove a device from tracking
-   * @param {string} uid - The user's ID
-   * @param {string} deviceId - The device ID to remove
-   */
-  removeDevice(uid, deviceId) {
-    try {
-      if (!uid || !deviceId) return;
-
-      const userDevices = this.getUserDevices(uid);
-      const updatedDevices = userDevices.filter(device => device.id !== deviceId);
-      this.storeUserDevices(uid, updatedDevices);
-    } catch (error) {
-      console.error('Error removing device:', error);
-    }
-  },
-
-  /**
    * Detect platform name from user agent
    * @private
    * @returns {string} The detected platform name
@@ -373,11 +276,6 @@ const TokenService = {
         return;
       }
 
-      if (this.isRateLimited()) {
-        console.debug("Token set rate limited. Skipping redundant token update.");
-        return;
-      }
-
       const currentToken = this.getToken();
       if (currentToken === token) {
         console.debug("Token unchanged. Skipping redundant update.");
@@ -389,10 +287,8 @@ const TokenService = {
       this._storage.setItem(this.tokenExpiryKey, expiryTime.toString());
 
       this.updateLastTokenSetTime();
-      
-      console.log(`Token set. Expires at: ${new Date(expiryTime).toLocaleString()}`);
 
-      this.handleDeviceTracking(uid);
+      console.log(`Token set. Expires at: ${new Date(expiryTime).toLocaleString()}`);
     } catch (error) {
       console.error('Error setting token:', error);
     }

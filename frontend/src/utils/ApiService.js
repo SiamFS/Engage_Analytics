@@ -408,22 +408,6 @@ const ApiService = {
     }
   },
 
-  /**
-   * Setting session token for Django REST Framework browsable API
-   */
-  async setSessionTokenForDRFBrowsableAPI(token) {
-    if (!token) {
-      throw new Error('Token is required');
-    }
-    
-    const response = await fetch(`${API_BASE_URL}/set-token/`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token }),
-    });
-    
-    return await response.json();
-  }
 };
 
 export default ApiService;

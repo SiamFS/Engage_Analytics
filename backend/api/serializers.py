@@ -72,6 +72,8 @@ class UserSerializer(serializers.ModelSerializer):
             "firebase_uid",
             "is_active",
             "date_joined",
+            "photo_url",
+            "devices",
         ]
         read_only_fields = ["firebase_uid", "is_active", "date_joined"]
 
@@ -456,6 +458,8 @@ class UserManagementSerializer(serializers.ModelSerializer):
             "date_joined",
             "last_login",
             "company_name",
+            "photo_url",
+            "devices",
         ]
         read_only_fields = ["id", "date_joined", "last_login"]
 
@@ -468,6 +472,7 @@ class UserManagementSerializer(serializers.ModelSerializer):
 class UserCreateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
     company_name = serializers.CharField(required=False, allow_blank=True)
+    photo_url = serializers.URLField(required=False, allow_blank=True)
 
     class Meta:
         model = User
@@ -479,6 +484,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
             "password",
             "is_active",
             "company_name",
+            "photo_url",
         ]
 
     def create(self, validated_data):

@@ -5,6 +5,7 @@ from django.conf import settings
 from django.db.models import F, Max
 from django.http import Http404
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 
 from rest_framework import generics, status
 from rest_framework.exceptions import AuthenticationFailed
@@ -795,6 +796,67 @@ class UserWebcamRecordingsView(generics.ListAPIView):
         return WebcamRecording.objects.filter(
             recorder=self.request.user
         ).select_related("video", "recorder", "video__uploader").order_by("-recording_date")
+
+
+class UserProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from api.serializers import UserSerializer
+        return Response(UserSerializer(request.user).data)
+
+    def patch(self, request):
+        from api.serializers import UserSerializer
+        serializer = UserSerializer(request.user, data=request.data, partial=True)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.save()
+        return Response(serializer.data)
+
+
+class UserDeviceView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response(request.user.devices or [])
+
+    def post(self, request):
+        device_id = request.data.get("id")
+        device_name = request.data.get("name")
+        if not device_id or not device_name:
+            return Response(
+                {"error": "id and name are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        devices = request.user.devices or []
+        existing = next((d for d in devices if d["id"] == device_id), None)
+        now = timezone.now().isoformat()
+        if existing:
+            existing["name"] = device_name
+            existing["lastActive"] = now
+        else:
+            if len(devices) >= 5:
+                return Response(
+                    {"error": "Maximum device limit reached (5). Please remove a device first.", "code": "MAX_DEVICES_REACHED"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            devices.append({"id": device_id, "name": device_name, "lastActive": now})
+        request.user.devices = devices
+        request.user.save(update_fields=["devices"])
+        return Response(devices, status=status.HTTP_201_OK)
+
+    def delete(self, request):
+        device_id = request.query_params.get("device_id")
+        if not device_id:
+            return Response(
+                {"error": "device_id query parameter is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        devices = request.user.devices or []
+        devices = [d for d in devices if d["id"] != device_id]
+        request.user.devices = devices
+        request.user.save(update_fields=["devices"])
+        return Response(devices)
 
 
 class HealthCheckView(APIView):

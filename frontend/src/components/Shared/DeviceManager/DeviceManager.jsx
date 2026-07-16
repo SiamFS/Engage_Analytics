@@ -5,6 +5,7 @@ import { AuthContext } from '../../../contexts/AuthProvider/AuthProvider';
 import { ErrorMessage } from '../../common/ErrorMessage/ErrorMessage';
 import { Smartphone, Laptop, Trash2, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import TokenService from '../../../utils/TokenService';
 
 const PasswordInputField = ({ password, setPassword, showPassword, setShowPassword }) => (
   <div className="space-y-1.5 sm:space-y-2 w-full">
@@ -343,8 +344,8 @@ const DeviceManager = () => {
   const sortDevices = (userDevices) => {
     if (!Array.isArray(userDevices)) return [];
     return [...userDevices].sort((a, b) => {
-      const aCurrent = String(a.id) === String(window.TokenService?.getCurrentDeviceId?.() || '');
-      const bCurrent = String(b.id) === String(window.TokenService?.getCurrentDeviceId?.() || '');
+      const aCurrent = String(a.id) === String(TokenService.getCurrentDeviceId?.() || '');
+      const bCurrent = String(b.id) === String(TokenService.getCurrentDeviceId?.() || '');
       if (aCurrent) return -1;
       if (bCurrent) return 1;
       return new Date(b.lastActive || 0) - new Date(a.lastActive || 0);
@@ -387,7 +388,7 @@ const DeviceManager = () => {
     if (result) {
       setSuccess(`Device "${selectedDevice.name}" has been removed`);
       setTimeout(() => setSuccess(''), 3000);
-      if (selectedDevice.id !== window.TokenService?.getCurrentDeviceId()) {
+      if (selectedDevice.id !== TokenService.getCurrentDeviceId()) {
         await loadDevices();
       }
       
@@ -409,7 +410,7 @@ const DeviceManager = () => {
   };
 
   const isCurrentDevice = (device) => {
-    return device.id === window.TokenService?.getCurrentDeviceId();
+    return device.id === TokenService.getCurrentDeviceId();
   };
 
   const handleBackClick = () => {

@@ -57,6 +57,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     date_joined = models.DateTimeField(default=timezone.now)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
+    photo_url = models.URLField(max_length=1024, blank=True, default="")
+    devices = models.JSONField(default=list, blank=True)
 
     objects = CustomUserManager()
 

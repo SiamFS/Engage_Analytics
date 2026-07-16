@@ -1,12 +1,12 @@
 import React, { useState, useContext, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { AuthContext } from '../../../contexts/AuthProvider/AuthProvider';
-import { updateProfile } from 'firebase/auth';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { db, auth } from '../../../firebase/firebase.config';
+import { updateProfile, sendEmailVerification } from 'firebase/auth';
+import { auth } from '../../../firebase/firebase.config';
 import { Button, Card, Label, TextInput, Spinner, Toast } from 'flowbite-react';
 import { Camera, Upload, X, User, Mail, Image, Check, AlertTriangle } from 'lucide-react';
 import TokenService from '../../../utils/TokenService';
+import ApiService from '../../../utils/ApiService';
 
 const DEFAULT_AVATAR = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-7 8-7s8 3 8 7"/></svg>');
 const IMGBB_API_KEY = import.meta.env.VITE_IMGBB_API_KEY;
@@ -192,39 +192,78 @@ InputField.propTypes = {
   required: PropTypes.bool
 };
 
-const EmailField = ({ email = '', isVerified = false }) => (
-  <div>
-    <Label htmlFor="email" value="Email Address" className="text-xs font-medium text-gray-300" />
-    <div className="mt-1 relative">
-      <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-        <Mail className="w-4 h-4 text-gray-400" />
+const EmailField = ({ email = '', isVerified = false, onResendVerification = null }) => {
+  const [resending, setResending] = useState(false);
+  const [resent, setResent] = useState(false);
+  const [resendError, setResendError] = useState('');
+
+  const handleResend = async () => {
+    if (!onResendVerification) return;
+    setResending(true);
+    setResendError('');
+    try {
+      await onResendVerification();
+      setResent(true);
+      setTimeout(() => setResent(false), 5000);
+    } catch (err) {
+      if (err.code === 'auth/too-many-requests') {
+        setResendError('Too many requests. Please wait before trying again.');
+      } else {
+        setResendError('Failed to send verification email. Please try again.');
+      }
+    }
+    setResending(false);
+  };
+
+  return (
+    <div>
+      <Label htmlFor="email" value="Email Address" className="text-xs font-medium text-gray-300" />
+      <div className="mt-1 relative">
+        <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+          <Mail className="w-4 h-4 text-gray-400" />
+        </div>
+        <input
+          id="email"
+          type="email"
+          value={email || ''}
+          disabled
+          readOnly
+          className="w-full bg-surface-600 border border-elevated-border text-gray-400 rounded-lg text-sm px-2.5 py-2.5 pl-10 shadow-sm"
+        />
       </div>
-      <input
-        id="email"
-        type="email"
-        value={email || ''}
-        disabled
-        readOnly
-        className="w-full bg-surface-600 border border-elevated-border text-gray-400 rounded-lg text-sm px-2.5 py-2.5 pl-10 shadow-sm"
-      />
+      <div className="mt-1 flex items-center gap-2">
+        {isVerified ? (
+          <span className="text-xs text-green-500 flex items-center">
+            <Check className="mr-1" /> Email verified
+          </span>
+        ) : (
+          <>
+            <span className="text-xs text-red-500 flex items-center">
+              <AlertTriangle className="mr-1" /> Email not verified
+            </span>
+            {onResendVerification && (
+              <button
+                onClick={handleResend}
+                disabled={resending || resent}
+                className="text-xs text-blue-400 hover:text-blue-300 underline disabled:text-gray-500 disabled:no-underline"
+              >
+                {resent ? 'Verification email sent! Check spam folder too.' : resending ? 'Sending...' : 'Resend verification email'}
+              </button>
+            )}
+            {resendError && (
+              <span className="text-xs text-red-400">{resendError}</span>
+            )}
+          </>
+        )}
+      </div>
     </div>
-    <div className="mt-1 flex items-center">
-      {isVerified ? (
-        <span className="text-xs text-green-500 flex items-center">
-          <Check className="mr-1" /> Email verified
-        </span>
-      ) : (
-        <span className="text-xs text-red-500 flex items-center">
-          <AlertTriangle className="mr-1" /> Email not verified
-        </span>
-      )}
-    </div>
-  </div>
-);
+  );
+};
 
 EmailField.propTypes = {
   email: PropTypes.string,
-  isVerified: PropTypes.bool
+  isVerified: PropTypes.bool,
+  onResendVerification: PropTypes.func,
 };
 
 const formatDate = (timestamp) => {
@@ -374,41 +413,29 @@ const useProfileData = (user) => {
 
   const fetchUserData = async () => {
     if (!user?.uid) return null;
-    
+
     try {
-      const userDocRef = doc(db, 'users', user.uid);
-      const userSnapshot = await getDoc(userDocRef);
-      
-      if (userSnapshot.exists()) {
-        const userData = userSnapshot.data();
-        
-        setFormState({
-          firstName: userData.firstName || '',
-          lastName: userData.lastName || '',
-          photoURL: userData.photoURL || DEFAULT_AVATAR,
-          email: user.email || ''
-        });
-        
-        if (userData.updatedAt) {
-          setLastUpdateTime(userData.updatedAt.toDate());
-          TokenService.setProfileUpdateTime(user.uid, userData.updatedAt.toDate());
-        }
-        
-        return userData;
-      } else {
-        const names = (user.displayName || '').split(' ');
-        setFormState({
-          firstName: names[0] || '',
-          lastName: names.slice(1).join(' ') || '',
-          photoURL: user.photoURL || DEFAULT_AVATAR,
-          email: user.email || ''
-        });
-      }
+      const profile = await ApiService.get('/api/user/profile/');
+
+      setFormState({
+        firstName: profile.first_name || '',
+        lastName: profile.last_name || '',
+        photoURL: profile.photo_url || DEFAULT_AVATAR,
+        email: user.email || ''
+      });
+
+      return profile;
     } catch (error) {
       console.error('Error fetching user data:', error);
+      const names = (user.displayName || '').split(' ');
+      setFormState({
+        firstName: names[0] || '',
+        lastName: names.slice(1).join(' ') || '',
+        photoURL: user.photoURL || DEFAULT_AVATAR,
+        email: user.email || ''
+      });
       return null;
     }
-    return null;
   };
 
   useEffect(() => {
@@ -446,26 +473,23 @@ const useProfileActions = (user, formState, setLastUpdateTime, showToast, resetD
   
   const updateUserProfile = async () => {
     const { firstName, lastName, photoURL } = formState;
-    
-    const userDocRef = doc(db, 'users', user.uid);
     const currentTime = new Date();
-    
-    await updateDoc(userDocRef, {
-      firstName,
-      lastName,
-      photoURL,
-      updatedAt: currentTime
+
+    await ApiService.patch('/api/user/profile/', {
+      first_name: firstName,
+      last_name: lastName,
+      photo_url: photoURL,
     });
-    
+
     await updateProfile(auth.currentUser, {
       displayName: `${firstName} ${lastName}`.trim(),
       photoURL: photoURL
     });
-    
+
     const token = await auth.currentUser.getIdToken(true);
     TokenService.setToken(token, user.uid);
     TokenService.setProfileUpdateTime(user.uid, currentTime);
-    
+
     return currentTime;
   };
 
@@ -627,6 +651,15 @@ const useToast = () => {
 const Profile = () => {
   const { user } = useContext(AuthContext);
   const { toast, showToast, dismissToast } = useToast();
+
+  const handleResendVerification = async () => {
+    if (!auth.currentUser) {
+      const error = new Error('No authenticated user');
+      error.code = 'auth/no-current-user';
+      throw error;
+    }
+    await sendEmailVerification(auth.currentUser);
+  };
   
   const {
     formState,
@@ -747,7 +780,7 @@ const Profile = () => {
               </div>
             </div>
             
-            <EmailField email={formState.email || user.email} isVerified={isEmailVerified} />
+            <EmailField email={formState.email || user.email} isVerified={isEmailVerified} onResendVerification={handleResendVerification} />
             
             <AccountInfoSection user={user} lastUpdateTime={lastUpdateTime} />
             
