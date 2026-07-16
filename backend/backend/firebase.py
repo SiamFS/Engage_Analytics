@@ -44,6 +44,3 @@ def get_firebase_app():
     except Exception as e:
         logger.exception("Unexpected error during Firebase initialization")
         return None
-
-
-default_app = get_firebase_app()
