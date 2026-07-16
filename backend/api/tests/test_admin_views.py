@@ -276,8 +276,8 @@ class TestPromoteToAdminView:
     """Test the PromoteToAdminView admin API."""    
     
     @patch('api.admin_views.firebase_auth.get_user')
-    @patch('api.admin_views.db')
-    def test_promote_user_to_admin_success(self, mock_db, mock_get_user, admin_client, regular_user):
+    @patch('api.admin_views._get_firestore_db')
+    def test_promote_user_to_admin_success(self, mock_get_db, mock_get_user, admin_client, regular_user):
         """Test successfully promoting a regular user to admin."""        
         # Mock Firebase auth and db
         mock_get_user.return_value = {'uid': regular_user.firebase_uid}
@@ -286,7 +286,9 @@ class TestPromoteToAdminView:
         mock_document = MagicMock()
         mock_collection = MagicMock()
         mock_collection.document.return_value = mock_document
+        mock_db = MagicMock()
         mock_db.collection.return_value = mock_collection
+        mock_get_db.return_value = mock_db
         
         url = reverse('admin-promote-user')
         data = {
@@ -314,8 +316,8 @@ class TestPromoteToAdminView:
         assert not ViewerProfile.objects.filter(user=regular_user).exists()
     
     @patch('api.admin_views.firebase_auth.get_user')
-    @patch('api.admin_views.db')
-    def test_promote_company_user_to_admin(self, mock_db, mock_get_user, admin_client, company_user):
+    @patch('api.admin_views._get_firestore_db')
+    def test_promote_company_user_to_admin(self, mock_get_db, mock_get_user, admin_client, company_user):
         """Test promoting a company user to admin."""        
         # Mock Firebase auth and db
         mock_get_user.return_value = {'uid': company_user.firebase_uid}
@@ -324,7 +326,9 @@ class TestPromoteToAdminView:
         mock_document = MagicMock()
         mock_collection = MagicMock()
         mock_collection.document.return_value = mock_document
+        mock_db = MagicMock()
         mock_db.collection.return_value = mock_collection
+        mock_get_db.return_value = mock_db
         
         url = reverse('admin-promote-user')
         data = {
@@ -374,8 +378,8 @@ class TestPromoteToAdminView:
         assert regular_user.role == 'user'
     
     @patch('api.admin_views.firebase_auth.get_user')
-    @patch('api.admin_views.db')
-    def test_promote_user_firebase_db_failure(self, mock_db, mock_get_user, admin_client, regular_user):
+    @patch('api.admin_views._get_firestore_db')
+    def test_promote_user_firebase_db_failure(self, mock_get_db, mock_get_user, admin_client, regular_user):
         """Test handling a Firebase Firestore database failure during promotion."""        
         # Mock Firebase auth for the requesting admin
         mock_get_user.return_value = {'uid': admin_client.handler._force_user.firebase_uid}
@@ -387,7 +391,9 @@ class TestPromoteToAdminView:
         mock_collection = MagicMock()
         mock_collection.document.return_value = mock_document
 
+        mock_db = MagicMock()
         mock_db.collection.return_value = mock_collection
+        mock_get_db.return_value = mock_db
 
         url = reverse('admin-promote-user')
         data = {

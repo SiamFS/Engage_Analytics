@@ -37,7 +37,14 @@ from api.services.upload_request_service import UploadRequestService
 from api.utils import safe_int_param
 
 logger = logging.getLogger(__name__)
-db = firestore.client()
+
+
+def _get_firestore_db():
+    try:
+        return firestore.client()
+    except Exception:
+        logger.exception("Failed to get Firestore client")
+        return None
 
 
 class UserSearchView(generics.GenericAPIView):
@@ -95,6 +102,9 @@ class PromoteToAdminView(generics.CreateAPIView):
 
             # Update role in Firebase
             try:
+                db = _get_firestore_db()
+                if db is None:
+                    raise Exception("Firestore client unavailable")
                 user_ref = db.collection("users").document(target_user.firebase_uid)
                 user_ref.update({"role": "admin"})
 
