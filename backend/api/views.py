@@ -829,13 +829,13 @@ class UserDeviceView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         devices = request.user.devices or []
-        existing = next((d for d in devices if d["id"] == device_id), None)
+        existing = next((d for d in devices if d.get("id") == device_id), None)
         now = timezone.now().isoformat()
         if existing:
             existing["name"] = device_name
             existing["lastActive"] = now
         else:
-            if len(devices) >= 5:
+            if len([d for d in devices if d.get("id")]) >= 5:
                 return Response(
                     {"error": "Maximum device limit reached (5). Please remove a device first.", "code": "MAX_DEVICES_REACHED"},
                     status=status.HTTP_403_FORBIDDEN,
@@ -843,7 +843,7 @@ class UserDeviceView(APIView):
             devices.append({"id": device_id, "name": device_name, "lastActive": now})
         request.user.devices = devices
         request.user.save(update_fields=["devices"])
-        return Response(devices, status=status.HTTP_201_OK)
+        return Response(devices, status=status.HTTP_200_OK)
 
     def delete(self, request):
         device_id = request.query_params.get("device_id")
@@ -853,7 +853,7 @@ class UserDeviceView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         devices = request.user.devices or []
-        devices = [d for d in devices if d["id"] != device_id]
+        devices = [d for d in devices if d.get("id") != device_id]
         request.user.devices = devices
         request.user.save(update_fields=["devices"])
         return Response(devices)

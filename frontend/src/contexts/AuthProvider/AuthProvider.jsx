@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { createContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { auth } from "../../firebase/firebase.config";
 import {
   createUserWithEmailAndPassword,
@@ -106,6 +106,7 @@ const AuthProvider = ({ children }) => {
   const [sessionExpiring, setSessionExpiring] = useState(false);
   const [sessionTimeRemaining, setSessionTimeRemaining] = useState(null);
   const [googleAuthChecked, setGoogleAuthChecked] = useState(false);
+  const authProcessingRef = useRef(false);
 
   const updateUserDevices = async (deviceId) => {
     const deviceName = TokenService.getDeviceName();
@@ -405,6 +406,8 @@ const AuthProvider = ({ children }) => {
   // Main auth state listener
   useEffect(() => {
     const handleAuthStateChange = async (currentUser) => {
+      if (authProcessingRef.current) return;
+      authProcessingRef.current = true;
       try {
         if (currentUser) {
           // Only attempt to process and get token if the user is authenticated
@@ -435,8 +438,10 @@ const AuthProvider = ({ children }) => {
         console.error("Auth state change error:", error);
         TokenService.clearAuth();
         setUser(null);
+      } finally {
+        authProcessingRef.current = false;
       }
-      
+
       setLoading(false);
     };
 
