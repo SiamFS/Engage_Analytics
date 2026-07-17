@@ -107,6 +107,7 @@ const AuthProvider = ({ children }) => {
   const [sessionTimeRemaining, setSessionTimeRemaining] = useState(null);
   const [googleAuthChecked, setGoogleAuthChecked] = useState(false);
   const authProcessingRef = useRef(false);
+  const profileCacheRef = useRef({ uid: null, data: null });
 
   const updateUserDevices = async (deviceId) => {
     const deviceName = TokenService.getDeviceName();
@@ -322,10 +323,12 @@ const AuthProvider = ({ children }) => {
 
       TokenService.clearAuth();
       VideoService.clearCache();
+      profileCacheRef.current = { uid: null, data: null };
       return signOut(auth);
     } catch (error) {
       console.error('Error during logout:', error);
       TokenService.clearAuth();
+      profileCacheRef.current = { uid: null, data: null };
       return signOut(auth);
     }
   };
@@ -433,11 +436,13 @@ const AuthProvider = ({ children }) => {
           setUser(null);
           setSessionExpiring(false);
           setSessionTimeRemaining(null);
+          profileCacheRef.current = { uid: null, data: null };
         }
       } catch (error) {
         console.error("Auth state change error:", error);
         TokenService.clearAuth();
         setUser(null);
+        profileCacheRef.current = { uid: null, data: null };
       } finally {
         authProcessingRef.current = false;
       }
@@ -455,14 +460,20 @@ const AuthProvider = ({ children }) => {
           }, currentUser.uid);
         }
 
+        if (profileCacheRef.current.uid === currentUser.uid && profileCacheRef.current.data) {
+          return profileCacheRef.current.data;
+        }
+
         try {
           const profile = await ApiService.get('/user/profile/');
-          return {
+          const data = {
             role: profile.role,
             firstName: profile.first_name,
             lastName: profile.last_name,
             photoURL: profile.photo_url || currentUser.photoURL || DEFAULT_AVATAR,
           };
+          profileCacheRef.current = { uid: currentUser.uid, data };
+          return data;
         } catch {
           return {};
         }
