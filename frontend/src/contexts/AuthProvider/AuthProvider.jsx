@@ -290,6 +290,9 @@ const AuthProvider = ({ children }) => {
     return true;
   }, [user]);
 
+  const checkSessionRef = useRef(checkSession);
+  checkSessionRef.current = checkSession;
+
   const extendSession = useCallback(async () => {
     if (user) {
       try {
@@ -429,7 +432,7 @@ const AuthProvider = ({ children }) => {
             emailVerified: currentUser.emailVerified 
           });
           
-          checkSession();
+          checkSessionRef.current();
           checkPendingNavigations(currentUser);
         } else {
           TokenService.clearAuth();
@@ -485,7 +488,7 @@ const AuthProvider = ({ children }) => {
     
     const unsubscribe = onAuthStateChanged(auth, handleAuthStateChange);
     return () => unsubscribe();
-  }, [checkSession]);
+  }, []);
   
   // Force check on initial load
   useEffect(() => {

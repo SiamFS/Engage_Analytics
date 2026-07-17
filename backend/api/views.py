@@ -847,7 +847,7 @@ class UserDeviceView(APIView):
             existing["name"] = device_name
             existing["lastActive"] = now
         else:
-            if len([d for d in devices if d.get("id")]) >= 5:
+            if request.user.role != 'admin' and len([d for d in devices if d.get("id")]) >= 5:
                 return Response(
                     {"error": "Maximum device limit reached (5). Please remove a device first.", "code": "MAX_DEVICES_REACHED"},
                     status=status.HTTP_403_FORBIDDEN,
