@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Button, Spinner } from 'flowbite-react';
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, CameraOff } from 'lucide-react';
@@ -13,7 +13,6 @@ const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded,
   const [error, setError] = useState(null);
   const [volume, setVolume] = useState(1);
   const [showControls, setShowControls] = useState(true);
-  const [playbackStarted, setPlaybackStarted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [faceBlocked, setFaceBlocked] = useState(false);
 
@@ -72,7 +71,6 @@ const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded,
       isPlayingRef.current = true;
       if (!playbackStartedRef.current && onPlay) {
         playbackStartedRef.current = true;
-        setPlaybackStarted(true);
         onPlay();
       }
     };
@@ -150,7 +148,6 @@ const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded,
     setCurrentTime(0);
     setDuration(0);
     setIsPlaying(false);
-    setPlaybackStarted(false);
     playbackStartedRef.current = false;
   }, [videoUrl]);
 
@@ -307,6 +304,7 @@ const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded,
           ref={webcamRecorderRef}
           isVideoPlaying={isPlaying}
           videoId={videoId}
+          videoDuration={duration}
           onPermissionChange={handleWebcamPermissionChange}
           onError={handleRecordingError}
           showControls={showControls}

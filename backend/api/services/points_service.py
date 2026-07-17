@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 class PointsService:
     @staticmethod
-    def award_points_for_webcam_upload(user, points=10):
+    def award_points_for_webcam_upload(user, points=5):
         """Awards points to a user for successfully uploading webcam data."""
         with transaction.atomic():
             profile, _ = ViewerProfile.objects.get_or_create(user=user)

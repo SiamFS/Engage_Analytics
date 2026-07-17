@@ -429,6 +429,9 @@ class WebcamRecording(models.Model):
     analysis_attempts = models.PositiveIntegerField(default=0)
     analysis_started_at = models.DateTimeField(null=True, blank=True)
     points_awarded = models.BooleanField(default=False)
+    liveness_data = models.JSONField(default=dict, blank=True)
+    liveness_passed = models.BooleanField(default=False)
+    liveness_score = models.FloatField(null=True, blank=True)
 
     class Meta:
         ordering = ["-recording_date"]

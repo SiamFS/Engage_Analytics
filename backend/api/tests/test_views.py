@@ -639,8 +639,5 @@ class TestWebcamUploadView:
         data = {'filename': 'test_recording.webm'}
         response = authenticated_client.post(url, data, format='json')
 
-        # SAS generation errors are caught by service; controller still returns success
-        assert response.status_code == status.HTTP_201_CREATED
-        assert 'upload_url' in response.data
-        assert response.data['upload_url'] is None
-        assert 'recording_id' in response.data
+        assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+        assert 'error' in response.data

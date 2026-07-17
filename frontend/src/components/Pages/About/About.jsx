@@ -1,9 +1,11 @@
-import React from 'react';
+import { useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BarChart3, PieChart, Activity, Video, Camera, Brain, Shield, ChevronRight, Star, Award, Users, Target, TrendingUp, ThumbsUp } from 'lucide-react';
+import { BarChart3, Camera, Brain, Shield, ChevronRight, Award, Users, Target, TrendingUp, ThumbsUp } from 'lucide-react';
+import { AuthContext } from '../../../contexts/AuthProvider/AuthProvider';
 
 const About = () => {
   const navigate = useNavigate();
+  const { user } = useContext(AuthContext);
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center bg-surface relative overflow-hidden">
@@ -118,17 +120,44 @@ const About = () => {
         </div>
 
         <div className="text-center">
-          <h2 className="text-2xl md:text-3xl font-bold mb-4 text-white">Ready to see how your audience really feels?</h2>
-          <p className="text-gray-300 mb-8 max-w-xl mx-auto">
-            Sign up free and start measuring emotional engagement in your video ads today.
-          </p>
-          <button
-            onClick={() => navigate('/login')}
-            className="px-8 py-3 bg-brand-600 hover:bg-brand-500 text-white font-medium rounded-full shadow-lg transition-all duration-300 flex items-center mx-auto"
-            type="button"
-          >
-            Get Started <ChevronRight className="ml-2 w-5 h-5" />
-          </button>
+          {user ? (
+            <>
+              <h2 className="text-2xl md:text-3xl font-bold mb-4 text-white">Start earning rewards today</h2>
+              <p className="text-gray-300 mb-8 max-w-xl mx-auto">
+                Watch videos with your webcam on and earn points. Your dashboard tracks everything.
+              </p>
+              <div className="flex gap-4 justify-center">
+                <button
+                  onClick={() => navigate('/videos')}
+                  className="px-8 py-3 bg-brand-600 hover:bg-brand-500 text-white font-medium rounded-full shadow-lg transition-all duration-300 flex items-center"
+                  type="button"
+                >
+                  Browse Videos <ChevronRight className="ml-2 w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => navigate('/dashboard')}
+                  className="px-8 py-3 bg-elevated hover:bg-elevated-hover text-white font-medium rounded-full shadow-lg transition-all duration-300 flex items-center border border-elevated-border"
+                  type="button"
+                >
+                  Dashboard <ChevronRight className="ml-2 w-5 h-5" />
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <h2 className="text-2xl md:text-3xl font-bold mb-4 text-white">Ready to see how your audience really feels?</h2>
+              <p className="text-gray-300 mb-8 max-w-xl mx-auto">
+                Sign up free and start measuring emotional engagement in your video ads today.
+              </p>
+              <button
+                onClick={() => navigate('/login')}
+                className="px-8 py-3 bg-brand-600 hover:bg-brand-500 text-white font-medium rounded-full shadow-lg transition-all duration-300 flex items-center mx-auto"
+                type="button"
+              >
+                Get Started <ChevronRight className="ml-2 w-5 h-5" />
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

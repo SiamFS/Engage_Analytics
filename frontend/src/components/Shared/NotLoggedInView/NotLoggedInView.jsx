@@ -1,6 +1,6 @@
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BarChart3, Camera, Brain, Shield, ChevronRight, Star, Award, Target, Users, TrendingUp } from 'lucide-react';
+import { BarChart3, Camera, Brain, Shield, ChevronRight, Award, Target, Users, TrendingUp, ThumbsUp } from 'lucide-react';
 
 const NotLoggedInView = () => {
   const navigate = useNavigate();
@@ -89,28 +89,31 @@ const NotLoggedInView = () => {
         </div>
 
         <div className="mb-16">
-          <h2 className="text-2xl md:text-3xl font-bold mb-8 text-white text-center">Earn Rewards</h2>
+          <h2 className="text-2xl md:text-3xl font-bold mb-8 text-white text-center">Rewards &amp; Points</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-            <div className="card-base bg-elevated border-elevated-border p-6 text-center">
-              <div className="w-12 h-12 bg-yellow-500/20 rounded-xl flex items-center justify-center mx-auto mb-4">
-                <Star size={24} className="text-yellow-400 fill-yellow-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-white mb-2">Upload Videos</h3>
-              <p className="text-gray-400 text-sm">Earn <span className="text-yellow-400 font-bold">10 points</span> per video upload.</p>
-            </div>
             <div className="card-base bg-elevated border-elevated-border p-6 text-center">
               <div className="w-12 h-12 bg-brand-500/20 rounded-xl flex items-center justify-center mx-auto mb-4">
                 <Camera size={24} className="text-brand-400" />
               </div>
               <h3 className="text-lg font-semibold text-white mb-2">Watch with Webcam</h3>
-              <p className="text-gray-400 text-sm">Earn <span className="text-yellow-400 font-bold">5 points</span> per video watched with webcam on.</p>
+              <p className="text-gray-400 text-sm mb-3">Earn <span className="text-yellow-400 font-bold">10 points</span> for each video you watch with your webcam enabled.</p>
+              <p className="text-xs text-gray-500">One-time reward per video view.</p>
+            </div>
+            <div className="card-base bg-elevated border-elevated-border p-6 text-center">
+              <div className="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center mx-auto mb-4">
+                <ThumbsUp size={24} className="text-purple-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-white mb-2">Rate Ads</h3>
+              <p className="text-gray-400 text-sm mb-3">Earn <span className="text-yellow-400 font-bold">3 points</span> for sharing your feedback on advertisements.</p>
+              <p className="text-xs text-gray-500">Optional — submit after watching with webcam.</p>
             </div>
             <div className="card-base bg-elevated border-elevated-border p-6 text-center">
               <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center mx-auto mb-4">
                 <Award size={24} className="text-green-400" />
               </div>
-              <h3 className="text-lg font-semibold text-white mb-2">Redeem Points</h3>
-              <p className="text-gray-400 text-sm">Convert at <span className="text-green-400 font-bold">10 BDT per point</span>. Track earnings on your dashboard.</p>
+              <h3 className="text-lg font-semibold text-white mb-2">Redeem Rewards</h3>
+              <p className="text-gray-400 text-sm mb-3">Convert your points at a rate of <span className="text-green-400 font-bold">10 BDT per point</span>.</p>
+              <p className="text-xs text-gray-500">Track your earnings on the dashboard.</p>
             </div>
           </div>
         </div>

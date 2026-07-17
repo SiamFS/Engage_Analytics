@@ -38,13 +38,13 @@ class TestPointsService:
         
         profile, points_awarded = PointsService.award_points_for_webcam_upload(test_user)
         
-        assert points_awarded == 10
-        assert profile.points == initial_points + 10
-        assert profile.points_earned == initial_earned + 10
+        assert points_awarded == 5
+        assert profile.points == initial_points + 5
+        assert profile.points_earned == initial_earned + 5
         
         viewer_profile.refresh_from_db()
-        assert viewer_profile.points == initial_points + 10
-        assert viewer_profile.points_earned == initial_earned + 10
+        assert viewer_profile.points == initial_points + 5
+        assert viewer_profile.points_earned == initial_earned + 5
 
     def test_award_points_for_webcam_upload_new_profile(self, db, test_user):
         """Test awarding points to a user without an existing profile."""
@@ -53,14 +53,14 @@ class TestPointsService:
         
         profile, points_awarded = PointsService.award_points_for_webcam_upload(test_user)
         
-        assert points_awarded == 10
-        assert profile.points == 10
-        assert profile.points_earned == 10
+        assert points_awarded == 5
+        assert profile.points == 5
+        assert profile.points_earned == 5
         
         assert ViewerProfile.objects.filter(user=test_user).exists()
         db_profile = ViewerProfile.objects.get(user=test_user)
-        assert db_profile.points == 10
-        assert db_profile.points_earned == 10
+        assert db_profile.points == 5
+        assert db_profile.points_earned == 5
 
     def test_award_points_custom_amount(self, test_user, viewer_profile):
         """Test awarding a custom number of points."""

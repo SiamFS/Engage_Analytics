@@ -462,10 +462,22 @@ class WebcamUploadView(generics.CreateAPIView):
 
         try:
             upload_url, view_url = WebcamUploadService.prepare_webcam_upload(filename)
+            if not upload_url:
+                logger.error("WebcamUploadService.prepare_webcam_upload returned None — Azure may not be configured")
+                return Response(
+                    {"error": "Upload service is temporarily unavailable. Please try again later."},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
 
             recording = WebcamUploadService.create_webcam_recording(
                 video, request.user, filename, view_url
             )
+            if not recording:
+                logger.error("WebcamUploadService.create_webcam_recording returned None")
+                return Response(
+                    {"error": "Failed to create recording entry. Please try again."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
 
             profile, points_awarded = PointsService.award_points_for_webcam_upload(
                 request.user

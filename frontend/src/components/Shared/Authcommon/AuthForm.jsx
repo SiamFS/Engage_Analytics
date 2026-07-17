@@ -1,4 +1,3 @@
-import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import BrandLogo from '../Brandlogo/brandlogo';
@@ -59,7 +58,7 @@ const AuthForm = ({
           <BrandLogo className="w-auto h-10 sm:h-12" />
         </div>
         <div className="relative bg-elevated backdrop-blur-md rounded-[16px] sm:rounded-[20px] md:rounded-[28px] border border-elevated-border shadow-2xl ring-1 ring-brand-900/30 p-4 sm:p-6 md:p-8 space-y-4 sm:space-y-5">
-          <h2 className="text-xl sm:text-2xl md:text-3xl font-semibold text-center text-white mb-2 sm:mb-3 sticky top-0 py-2 z-10">
+          <h2 className="text-xl sm:text-2xl md:text-3xl font-semibold text-center text-white mb-2 sm:mb-3">
             {title}
           </h2>
 
@@ -170,7 +169,7 @@ const AuthForm = ({
             </>
           )}
 
-          <p className="mt-4 sm:mt-5 md:mt-6 text-center text-xs sm:text-sm text-gray-400 sticky bottom-0 py-2">
+          <p className="mt-4 sm:mt-5 md:mt-6 text-center text-xs sm:text-sm text-gray-400">
             {footerText}{' '}
             <Link 
               to={footerLinkPath} 

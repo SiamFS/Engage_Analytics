@@ -1,4 +1,4 @@
-import React, { useContext, useState, useEffect, useRef } from "react";
+import { useContext, useState, useEffect, useRef } from "react";
 import { AuthContext } from "../../../contexts/AuthProvider/AuthProvider";
 import { Link, useNavigate } from "react-router-dom";
 import { BarChart3, Menu, X, User } from "lucide-react";
@@ -63,8 +63,8 @@ const NavigationBar = () => {
     return (
       <>
         <Link to="/" onClick={onClick} className={`${baseClass} ${activeClass}`}>Home</Link>
-        {!user && <Link to="/about" onClick={onClick} className={`${baseClass} ${inactiveClass}`}>About</Link>}
         <Link to="/videos" onClick={onClick} className={`${baseClass} ${inactiveClass}`}>Videos</Link>
+        {user && <Link to="/about" onClick={onClick} className={`${baseClass} ${inactiveClass}`}>About</Link>}
       </>
     );
   };
