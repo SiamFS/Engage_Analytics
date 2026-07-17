@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { createContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { auth } from "../../firebase/firebase.config";
 import {
   createUserWithEmailAndPassword,
@@ -55,7 +55,7 @@ const removeDeviceFromApi = async (deviceId) => {
 };
 
 // Helper function to process user data after authentication
-const processAuthenticatedUser = async (userCredential) => {
+const processAuthenticatedUser = async (userCredential, deviceId) => {
   if (!userCredential?.user) return null;
   
   try {
@@ -107,16 +107,13 @@ const AuthProvider = ({ children }) => {
   const [sessionTimeRemaining, setSessionTimeRemaining] = useState(null);
   const [googleAuthChecked, setGoogleAuthChecked] = useState(false);
   const authProcessingRef = useRef(false);
-  const checkSessionRef = useRef(null);
-  const signupInProgressRef = useRef(false);
 
   const updateUserDevices = async (deviceId) => {
     const deviceName = TokenService.getDeviceName();
     await addDeviceToApi(deviceId, deviceName);
   };
 
-  const createUser = useCallback(async (email, password, firstName, lastName) => {
-    signupInProgressRef.current = true;
+  const createUser = async (email, password, firstName, lastName) => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
 
@@ -124,6 +121,7 @@ const AuthProvider = ({ children }) => {
         await sendEmailVerification(userCredential.user);
       } catch (verificationError) {
         console.warn('Failed to send verification email:', verificationError.code);
+        // Continue even if verification email fails — user can request resend later
       }
 
       await updateProfile(userCredential.user, {
@@ -134,8 +132,10 @@ const AuthProvider = ({ children }) => {
       const deviceId = TokenService.getCurrentDeviceId();
       await updateUserDevices(deviceId);
 
+      // Sign out user immediately after account creation - they need to verify email first
       await signOut(auth);
       
+      // Return user data without processing authentication (no token set)
       return userCredential.user;
     } catch (error) {
       console.error('Error creating user:', error);
@@ -144,19 +144,19 @@ const AuthProvider = ({ children }) => {
         error.code = 'MAX_DEVICES_REACHED';
       }
       throw error;
-    } finally {
-      signupInProgressRef.current = false;
     }
-  }, []);
+  };
 
-  const login = useCallback(async (email, password) => {
+  const login = async (email, password) => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
 
       if (!userCredential.user.emailVerified) {
         try {
           await sendEmailVerification(userCredential.user);
-        } catch { /* ignore */ }
+        } catch {
+          // verification email may fail if already sent recently
+        }
         await signOut(auth);
         const error = new Error('Please verify your email before logging in. A new verification email has been sent. Check your inbox and spam folder.');
         error.code = 'EMAIL_NOT_VERIFIED';
@@ -169,7 +169,7 @@ const AuthProvider = ({ children }) => {
       try {
         await updateUserDevices(deviceId);
 
-        return userCredential.user;
+        return processAuthenticatedUser(userCredential, deviceId);
       } catch (error) {
         if (error.message === 'MAX_DEVICES_REACHED' || error.code === 'MAX_DEVICES_REACHED') {
           await signOut(auth);
@@ -185,10 +185,10 @@ const AuthProvider = ({ children }) => {
       }
       throw error;
     }
-  }, []);
+  };
 
   // Handle Google sign-in process
-  const handleGoogleSignIn = useCallback(async (result) => {
+  const handleGoogleSignIn = async (result) => {
     const deviceId = TokenService.getCurrentDeviceId();
 
     try {
@@ -199,7 +199,18 @@ const AuthProvider = ({ children }) => {
         throw error;
       }
 
+      const googlePhotoURL = result.user.photoURL;
+
       await updateUserDevices(deviceId);
+
+      const token = await result.user.getIdToken();
+      TokenService.setToken(token, result.user.uid);
+
+      TokenService.setGoogleAuthCache({
+        email: result.user.email,
+        displayName: result.user.displayName,
+        photoURL: googlePhotoURL
+      }, result.user.uid);
 
       return result.user;
     } catch (error) {
@@ -211,9 +222,9 @@ const AuthProvider = ({ children }) => {
       }
       throw error;
     }
-  }, []);
+  };
 
-  const signInWithGoogle = useCallback(async () => {
+  const signInWithGoogle = async () => {
     try {
       const cachedAuth = TokenService.getGoogleAuthCache();
       
@@ -236,7 +247,7 @@ const AuthProvider = ({ children }) => {
       
       throw error;
     }
-  }, [handleGoogleSignIn]);
+  };
 
   const resetPassword = async (email) => {
     try {
@@ -277,10 +288,6 @@ const AuthProvider = ({ children }) => {
     
     return true;
   }, [user]);
-
-  useEffect(() => {
-    checkSessionRef.current = checkSession;
-  });
 
   const extendSession = useCallback(async () => {
     if (user) {
@@ -323,7 +330,7 @@ const AuthProvider = ({ children }) => {
     }
   };
 
-  const removeDevice = useCallback(async (deviceId, password = null) => {
+  const removeDevice = async (deviceId, password = null) => {
     if (!user?.uid) return false;
 
     try {
@@ -351,9 +358,9 @@ const AuthProvider = ({ children }) => {
       }
       return false;
     }
-  }, [user]);
+  };
 
-  const getUserDevices = useCallback(async () => {
+  const getUserDevices = async () => {
     if (!user?.uid) return [];
 
     try {
@@ -362,7 +369,7 @@ const AuthProvider = ({ children }) => {
       console.error("Error getting devices:", error);
       return [];
     }
-  }, [user]);
+  };
 
   // Check for Google auth cache
   useEffect(() => {
@@ -387,20 +394,19 @@ const AuthProvider = ({ children }) => {
   useEffect(() => {
     if (!user) return undefined;
     
-    checkSessionRef.current?.();
+    checkSession();
     
     const intervalId = setInterval(() => {
-      checkSessionRef.current?.();
+      checkSession();
     }, 60 * 1000);
     
     return () => clearInterval(intervalId);
-  }, [user]);
+  }, [user, checkSession]);
 
   // Main auth state listener
   useEffect(() => {
     const handleAuthStateChange = async (currentUser) => {
       if (authProcessingRef.current) return;
-      if (currentUser && signupInProgressRef.current) return;
       authProcessingRef.current = true;
       try {
         if (currentUser) {
@@ -420,7 +426,7 @@ const AuthProvider = ({ children }) => {
             emailVerified: currentUser.emailVerified 
           });
           
-          checkSessionRef.current?.();
+          checkSession();
           checkPendingNavigations(currentUser);
         } else {
           TokenService.clearAuth();
@@ -468,7 +474,7 @@ const AuthProvider = ({ children }) => {
     
     const unsubscribe = onAuthStateChanged(auth, handleAuthStateChange);
     return () => unsubscribe();
-  }, []);
+  }, [checkSession]);
   
   // Force check on initial load
   useEffect(() => {
@@ -532,7 +538,7 @@ const AuthProvider = ({ children }) => {
     checkSession,
     googleAuthChecked,
     getGoogleAuthCache: safeGetGoogleAuthCache 
-  }), [user, loading, deviceError, sessionExpiring, sessionTimeRemaining, extendSession, checkSession, googleAuthChecked, safeGetGoogleAuthCache, createUser, login, signInWithGoogle, removeDevice, getUserDevices]);
+  }), [user, loading, deviceError, sessionExpiring, sessionTimeRemaining, extendSession, checkSession, googleAuthChecked, safeGetGoogleAuthCache]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
