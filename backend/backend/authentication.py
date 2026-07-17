@@ -1,4 +1,6 @@
 import logging
+import threading
+from django.db import models as db_models
 from rest_framework import authentication
 from rest_framework import exceptions
 from firebase_admin import auth
@@ -44,7 +46,7 @@ class FirebaseAuthentication(authentication.BaseAuthentication):
         return token_parts[1]
 
     def _verify_token(self, token):
-        return auth.verify_id_token(token, check_revoked=True)
+        return auth.verify_id_token(token)
 
     @staticmethod
     def _get_user_data(decoded_token):
@@ -72,51 +74,62 @@ class FirebaseAuthentication(authentication.BaseAuthentication):
 
     def _get_or_create_user(self, decoded_token):
         uid = decoded_token.get("uid", "")
-        try:
-            user = User.objects.get(firebase_uid=uid)
-            user_data = self._get_user_data(decoded_token)
+        user_data = self._get_user_data(decoded_token)
+        email = user_data["email"]
+
+        user = User.objects.filter(
+            db_models.Q(firebase_uid=uid)
+            | (db_models.Q(email=email) if email else db_models.Q(pk__isnull=True))
+        ).first()
+
+        if user:
+            is_existing_by_uid = user.firebase_uid == uid
             update_fields = []
+
+            if not is_existing_by_uid:
+                user.firebase_uid = uid
+                update_fields.append("firebase_uid")
+
             if user_data["photo_url"] and user.photo_url != user_data["photo_url"]:
                 user.photo_url = user_data["photo_url"]
                 update_fields.append("photo_url")
-            if user_data["email"] and user.email != user_data["email"]:
+
+            if is_existing_by_uid and user_data["email"] and user.email != user_data["email"]:
                 user.email = user_data["email"]
                 update_fields.append("email")
+
             if update_fields:
                 user.save(update_fields=update_fields)
             return user
-        except User.DoesNotExist:
-            user_data = self._get_user_data(decoded_token)
 
-            existing_user = User.objects.filter(email=user_data["email"]).first()
-            if existing_user:
-                existing_user.firebase_uid = user_data["firebase_uid"]
-                update_fields = ["firebase_uid"]
-                if user_data["photo_url"]:
-                    existing_user.photo_url = user_data["photo_url"]
-                    update_fields.append("photo_url")
-                existing_user.save(update_fields=update_fields)
-                return existing_user
+        user = User.objects.create_user(
+            firebase_uid=uid,
+            email=email,
+            first_name=user_data["first_name"],
+            last_name=user_data["last_name"],
+            role=user_data["role"],
+            photo_url=user_data["photo_url"],
+        )
+        self._create_user_profile(user, user_data["role"])
 
-            user = User.objects.create_user(
-                firebase_uid=user_data["firebase_uid"],
-                email=user_data["email"],
-                first_name=user_data["first_name"],
-                last_name=user_data["last_name"],
-                role=user_data["role"],
-                photo_url=user_data["photo_url"],
+        threading.Thread(
+            target=self._notify_admins_async,
+            args=(user_data, user.id),
+            daemon=True,
+        ).start()
+
+        return user
+
+    @staticmethod
+    def _notify_admins_async(user_data, user_id):
+        try:
+            user = User.objects.get(id=user_id)
+            from api.services.notification_service import NotificationService
+            NotificationService.notify_admins(
+                notification_type="new_user_registered",
+                title=f"New {user_data['role']} registered",
+                message=f"{user_data['email']} signed up as a {user_data['role']}.",
+                data={"user_id": user.id, "email": user_data["email"], "role": user_data["role"]},
             )
-            self._create_user_profile(user, user_data["role"])
-
-            try:
-                from api.services.notification_service import NotificationService
-                NotificationService.notify_admins(
-                    notification_type="new_user_registered",
-                    title=f"New {user_data['role']} registered",
-                    message=f"{user_data['email']} signed up as a {user_data['role']}.",
-                    data={"user_id": user.id, "email": user_data["email"], "role": user_data["role"]},
-                )
-            except Exception:
-                logger.exception("Failed to notify admins of new user registration")
-
-            return user
+        except Exception:
+            logger.exception("Failed to notify admins of new user registration")
