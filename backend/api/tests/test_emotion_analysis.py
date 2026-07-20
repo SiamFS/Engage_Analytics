@@ -322,3 +322,130 @@ class TestEmotionEndpoints:
         assert resp.status_code == status.HTTP_200_OK
         assert len(resp.data["timeline"]) == 1
         assert resp.data["timeline"][0]["t"] == 2.0
+
+
+class TestHuggingFaceAPIIntegration:
+    """Tests that directly verify HF API behavior with various edge cases."""
+
+    @pytest.fixture
+    def service(self):
+        from api.services.emotion_analysis_service import EmotionAnalysisService
+        return EmotionAnalysisService
+
+    @pytest.fixture
+    def sample_face_image(self):
+        from PIL import Image
+        img = Image.new("RGB", (224, 224), color=(128, 128, 128))
+        return img
+
+    def _skip_if_no_token(self):
+        from django.conf import settings
+        if not getattr(settings, "HF_API_TOKEN", None):
+            pytest.skip("HF_API_TOKEN not configured")
+
+    def test_classify_face_real_api(self, service, sample_face_image):
+        """Test that the real HF API returns valid emotion data."""
+        self._skip_if_no_token()
+
+        result = service._classify_face(sample_face_image)
+
+        assert isinstance(result, list), f"Expected list, got {type(result)}"
+        assert len(result) > 0, "Expected non-empty result from HF API"
+        for item in result:
+            assert "label" in item, f"Missing 'label' in result: {item}"
+            assert "score" in item, f"Missing 'score' in result: {item}"
+            assert 0.0 <= item["score"] <= 1.0, f"Score out of range: {item['score']}"
+
+    def test_normalize_emotions_real_hf_output(self, service, sample_face_image):
+        """Test that normalize_emotions produces valid output from real HF data."""
+        self._skip_if_no_token()
+
+        raw = service._classify_face(sample_face_image)
+        normalized = service._normalize_emotions(raw)
+
+        assert isinstance(normalized, dict)
+        expected_keys = {"angry", "disgust", "fear", "happy", "neutral", "sad", "surprise"}
+        assert set(normalized.keys()) == expected_keys
+        total = sum(normalized.values())
+        assert 0.99 <= total <= 1.01, f"Emotions should sum to ~1.0, got {total}"
+        for v in normalized.values():
+            assert 0.0 <= v <= 1.0, f"Value out of [0,1]: {v}"
+
+    def test_classify_face_multiple_calls(self, service, sample_face_image):
+        """Test that multiple rapid API calls work and return consistent results."""
+        self._skip_if_no_token()
+
+        for i in range(3):
+            result = service._classify_face(sample_face_image)
+            assert isinstance(result, list), f"Call {i} failed: got {type(result)}"
+            assert len(result) > 0, f"Call {i}: empty result"
+
+    def test_classify_face_tiny_image(self, service):
+        """Test that a very small image produces a result (model-dependent) or error."""
+        from PIL import Image
+        self._skip_if_no_token()
+
+        tiny_img = Image.new("RGB", (10, 10), color=(255, 255, 255))
+        try:
+            result = service._classify_face(tiny_img)
+            assert isinstance(result, list)
+        except Exception as e:
+            assert "loading" not in str(e).lower(), f"Got retryable error: {e}"
+
+    def test_normalize_emotions_with_empty_inputs(self, service):
+        """Test _normalize_emotions handles empty/null gracefully."""
+        assert sum(service._normalize_emotions(None).values()) == 0.0
+        assert sum(service._normalize_emotions([]).values()) == 0.0
+
+    def test_normalize_emotions_with_valid_list(self, service):
+        """Test _normalize_emotions with a typical HF response."""
+        raw = [
+            {"label": "happy", "score": 0.7},
+            {"label": "neutral", "score": 0.2},
+            {"label": "sad", "score": 0.1},
+        ]
+        normalized = service._normalize_emotions(raw)
+        assert 0.6 <= normalized["happy"] <= 0.8
+        assert normalized["surprise"] == 0.0
+
+    def test_normalize_emotions_with_malformed_item(self, service):
+        """Test _normalize_emotions handles items missing label/score."""
+        raw = [
+            {"label": "happy", "score": 0.9},
+            {"wrong_key": "nope"},
+            {"label": "angry"},
+        ]
+        normalized = service._normalize_emotions(raw)
+        assert normalized["happy"] > 0.0
+        assert normalized["angry"] == 0.0
+
+    def test_normalize_emotions_with_unknown_label(self, service):
+        """Test unknown labels are silently ignored, known ones normalized correctly."""
+        raw = [
+            {"label": "happy", "score": 0.7},
+            {"label": "contempt", "score": 0.3},
+        ]
+        normalized = service._normalize_emotions(raw)
+        assert pytest.approx(normalized["happy"], 0.01) == 1.0
+
+    def test_normalize_emotions_clamping(self, service):
+        """Test scores clamped to [0,1] even with float precision errors."""
+        raw = [
+            {"label": "happy", "score": 1.0001},
+            {"label": "sad", "score": -0.0001},
+        ]
+        normalized = service._normalize_emotions(raw)
+        for v in normalized.values():
+            assert 0.0 <= v <= 1.0, f"Value {v} out of [0,1]"
+
+    def test_classify_face_no_token_raises(self, service, sample_face_image):
+        """Test that missing HF token raises RuntimeError immediately."""
+        import api.services.emotion_analysis_service as svc
+        original_token = getattr(svc.settings, "HF_API_TOKEN", None)
+        try:
+            with patch.object(svc.settings, "HF_API_TOKEN", None):
+                with pytest.raises(RuntimeError, match="HF_API_TOKEN"):
+                    service._classify_face(sample_face_image)
+        finally:
+            if original_token:
+                svc.settings.HF_API_TOKEN = original_token

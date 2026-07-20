@@ -120,11 +120,11 @@ const SearchBar = ({
         }
       });
       
-      if (categories.size === 0) {
-        throw new Error("No categories found");
+      if (categories.size > 0) {
+        setRecommendedCategories(Array.from(categories).slice(0, MAX_CATEGORY_TILES));
+      } else {
+        setRecommendedCategories(["Entertainment", "Education", "Sports", "Music", "Technology", "Comedy"]);
       }
-      
-      setRecommendedCategories(Array.from(categories).slice(0, MAX_CATEGORY_TILES));
       
     } catch (e) {
       console.error("Error fetching recommended categories:", e);

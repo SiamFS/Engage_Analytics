@@ -42,32 +42,36 @@ const LoggedInView = () => {
             ApiService.get('recommendations/?limit=8')
           ]);
         
+        const seenIds = new Set();
+
         if (featuredResponse.status === 'fulfilled') {
           const data = Array.isArray(featuredResponse.value) ? featuredResponse.value : [];
           setFeaturedVideos(data);
+          data.forEach(v => seenIds.add(v.id));
         }
-
-        const seenIds = new Set();
 
         if (recentResponse.status === 'fulfilled') {
           const data = Array.isArray(recentResponse.value) ? recentResponse.value : [];
           const deduped = data.filter(v => !seenIds.has(v.id));
-          deduped.forEach(v => seenIds.add(v.id));
-          setRecentVideos(deduped);
+          const result = deduped.length > 0 ? deduped : data;
+          result.forEach(v => seenIds.add(v.id));
+          setRecentVideos(result);
         }
         
         if (trendingResponse.status === 'fulfilled') {
           const data = Array.isArray(trendingResponse.value) ? trendingResponse.value : [];
           const deduped = data.filter(v => !seenIds.has(v.id));
-          deduped.forEach(v => seenIds.add(v.id));
-          setPopularVideos(deduped);
+          const result = deduped.length > 0 ? deduped : data;
+          result.forEach(v => seenIds.add(v.id));
+          setPopularVideos(result);
         }
         
         if (recommendedResponse.status === 'fulfilled') {
           const data = Array.isArray(recommendedResponse.value) ? recommendedResponse.value : [];
           const deduped = data.filter(v => !seenIds.has(v.id));
-          deduped.forEach(v => seenIds.add(v.id));
-          setRecommendedVideos(deduped);
+          const result = deduped.length > 0 ? deduped : data;
+          result.forEach(v => seenIds.add(v.id));
+          setRecommendedVideos(result);
         }
         
       } catch (error) {

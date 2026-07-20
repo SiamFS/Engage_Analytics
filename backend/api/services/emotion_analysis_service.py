@@ -142,6 +142,8 @@ class EmotionAnalysisService:
             if not frames:
                 return
 
+            EmotionFrame.objects.filter(recording=recording).delete()
+
             to_create = []
             for t_seconds, face_image in frames:
                 raw = cls._classify_face(face_image)
@@ -165,7 +167,6 @@ class EmotionAnalysisService:
                     )
                 )
 
-            EmotionFrame.objects.filter(recording=recording).delete()
             EmotionFrame.objects.bulk_create(to_create, batch_size=100)
 
             try:
@@ -306,10 +307,13 @@ class EmotionAnalysisService:
     @classmethod
     def _classify_face(cls, face_image) -> List[Dict]:
         import io
+        import json
         import requests
 
         model = getattr(settings, "HF_EMOTION_MODEL", None) or DEFAULT_EMOTION_MODEL
         token = getattr(settings, "HF_API_TOKEN", None)
+        if not token:
+            raise RuntimeError("HF_API_TOKEN is not configured")
 
         buf = io.BytesIO()
         face_image.save(buf, format="PNG")
@@ -329,12 +333,39 @@ class EmotionAnalysisService:
                     },
                     timeout=60,
                 )
+
+                if resp.status_code == 200:
+                    try:
+                        body = resp.json()
+                    except json.JSONDecodeError:
+                        raise RuntimeError(f"HF returned invalid JSON: {resp.text[:500]}")
+
+                    if isinstance(body, dict) and "error" in body:
+                        error_msg = str(body.get("error", "")).lower()
+                        if "loading" in error_msg:
+                            estimated = body.get("estimated_time", delay)
+                            wait = min(float(estimated), MAX_BACKOFF)
+                            if attempt <= 10:
+                                time.sleep(wait)
+                                delay = wait * 1.5
+                                continue
+                            raise RuntimeError(f"HF model still loading after {attempt} attempts: {body['error']}")
+                        raise RuntimeError(f"HF returned error: {body['error']}")
+
+                    if not isinstance(body, list) or len(body) == 0:
+                        raise RuntimeError(f"HF returned unexpected response format: {resp.text[:500]}")
+
+                    return body
+
                 resp.raise_for_status()
-                return resp.json()
-            except Exception as exc:
+
+            except (RuntimeError, requests.RequestException, json.JSONDecodeError) as exc:
+                if isinstance(exc, RuntimeError) and not isinstance(exc, (requests.RequestException, json.JSONDecodeError)):
+                    raise
                 msg = str(exc).lower()
                 is_retryable = (
-                    "429" in msg or "rate" in msg or "timeout" in msg or "503" in msg
+                    "429" in msg or "rate" in msg or "timeout" in msg
+                    or "503" in msg or "502" in msg
                 )
                 if is_retryable and attempt <= 6:
                     time.sleep(min(delay, MAX_BACKOFF))
