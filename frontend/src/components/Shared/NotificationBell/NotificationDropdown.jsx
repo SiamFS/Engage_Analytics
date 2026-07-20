@@ -13,6 +13,12 @@ import {
   Shield,
   UserPlus,
   Megaphone,
+  Upload,
+  CheckCircle,
+  XCircle,
+  RefreshCw,
+  BarChart3,
+  MessageSquare,
   CheckCheck,
   Trash2,
   Loader2,
@@ -23,6 +29,7 @@ import NotificationService from '../../../utils/NotificationService';
 
 const ICON_MAP = {
   Heart, Camera, Brain, CheckCircle2, Award, EyeOff, Lock, Shield, UserPlus, Megaphone,
+  Upload, CheckCircle, XCircle, RefreshCw, BarChart3, MessageSquare,
 };
 
 const ICON_COLORS = {
@@ -36,6 +43,14 @@ const ICON_COLORS = {
   user_promoted: 'text-blue-400 bg-blue-500/10',
   new_user_registered: 'text-green-400 bg-green-500/10',
   system_announcement: 'text-pink-400 bg-pink-500/10',
+  upload_request_submitted: 'text-blue-400 bg-blue-500/10',
+  upload_request_approved: 'text-green-400 bg-green-500/10',
+  upload_request_rejected: 'text-red-400 bg-red-500/10',
+  upload_request_processing: 'text-purple-400 bg-purple-500/10',
+  upload_request_completed: 'text-green-400 bg-green-500/10',
+  upload_request_cancelled: 'text-gray-400 bg-gray-500/10',
+  upload_request_comment: 'text-yellow-400 bg-yellow-500/10',
+  feedback_submitted: 'text-green-400 bg-green-500/10',
 };
 
 const NotificationDropdown = ({ onClose, onViewAll, onCountUpdate }) => {
@@ -80,21 +95,28 @@ const NotificationDropdown = ({ onClose, onViewAll, onCountUpdate }) => {
     if (notification.is_read) return;
     try {
       await NotificationService.markAsRead(notification.id);
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === notification.id ? { ...n, is_read: true } : n))
-      );
-      const remaining = notifications.filter((n) => n.id !== notification.id && !n.is_read).length;
-      onCountUpdate(remaining);
+      setNotifications((prev) => {
+        const updated = prev.map((n) => (n.id === notification.id ? { ...n, is_read: true } : n));
+        const remaining = updated.filter((n) => !n.is_read).length;
+        onCountUpdate(remaining);
+        return updated;
+      });
     } catch {
       // silently fail
     }
   };
 
-  const handleDelete = async (e, notificationId) => {
+  const handleDelete = async (e, notificationId, isUnread) => {
     e.stopPropagation();
     try {
       await NotificationService.deleteNotification(notificationId);
-      setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+      setNotifications((prev) => {
+        const updated = prev.filter((n) => n.id !== notificationId);
+        if (isUnread) {
+          onCountUpdate(updated.filter((n) => !n.is_read).length);
+        }
+        return updated;
+      });
       setTotal((prev) => prev - 1);
     } catch {
       // silently fail
@@ -174,7 +196,7 @@ const NotificationDropdown = ({ onClose, onViewAll, onCountUpdate }) => {
             <button
               key={notification.id}
               onClick={() => handleNotificationClick(notification)}
-              className={`w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-surface-500/50 transition-colors border-b border-elevated-border last:border-b-0 ${
+              className={`group w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-surface-500/50 transition-colors border-b border-elevated-border last:border-b-0 ${
                 !notification.is_read ? 'bg-blue-900/10' : ''
               }`}
             >
@@ -189,7 +211,7 @@ const NotificationDropdown = ({ onClose, onViewAll, onCountUpdate }) => {
                     {notification.title}
                   </p>
                   <button
-                    onClick={(e) => handleDelete(e, notification.id)}
+                    onClick={(e) => handleDelete(e, notification.id, !notification.is_read)}
                     className="flex-shrink-0 p-0.5 text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
                     title="Delete"
                   >

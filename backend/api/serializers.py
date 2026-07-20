@@ -311,6 +311,7 @@ class EmotionRecordingSerializer(serializers.ModelSerializer):
 
 class NotificationSerializer(serializers.ModelSerializer):
     relative_time = serializers.SerializerMethodField()
+    recipient_email = serializers.SerializerMethodField()
 
     class Meta:
         model = Notification
@@ -325,11 +326,20 @@ class NotificationSerializer(serializers.ModelSerializer):
             "created_at",
             "read_at",
             "relative_time",
+            "recipient_email",
         ]
         read_only_fields = fields
 
     def get_relative_time(self, obj):
         return self._relative_time(obj.created_at)
+
+    def get_recipient_email(self, obj):
+        reveal = self.context.get("reveal_recipient", False)
+        if reveal and hasattr(obj, "recipient") and obj.recipient:
+            return obj.recipient.email
+        if reveal:
+            return obj.recipient.email if hasattr(obj, "recipient_id") else None
+        return None
 
     @staticmethod
     def _relative_time(dt):

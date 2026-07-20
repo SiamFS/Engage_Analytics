@@ -42,11 +42,13 @@ class NotificationService:
 
     @classmethod
     def get_unread_count(cls, user):
-        return Notification.objects.filter(recipient=user, is_read=False).count()
+        return Notification.objects.filter(
+            recipient=user, is_read=False, is_archived=False
+        ).count()
 
     @classmethod
     def get_notifications(cls, user, limit=20, offset=0, unread_only=False, notification_type=None):
-        qs = Notification.objects.filter(recipient=user)
+        qs = Notification.objects.filter(recipient=user, is_archived=False)
         if unread_only:
             qs = qs.filter(is_read=False)
         if notification_type:

@@ -4,8 +4,8 @@ class NotificationService {
   static _cache = {
     unreadCount: null,
     unreadCountTime: 0,
-    notifications: null,
-    notificationsTime: 0,
+    notifications: {},
+    notificationsTime: {},
     inProgress: {}
   };
 
@@ -19,8 +19,8 @@ class NotificationService {
   static clearCache() {
     this._cache.unreadCount = null;
     this._cache.unreadCountTime = 0;
-    this._cache.notifications = null;
-    this._cache.notificationsTime = 0;
+    this._cache.notifications = {};
+    this._cache.notificationsTime = {};
     this._cache.inProgress = {};
   }
 
@@ -43,10 +43,10 @@ class NotificationService {
 
   static async getNotifications(params = {}) {
     const { limit = 20, offset = 0, unreadOnly = false, type = null } = params;
-    const cacheKey = `notifications_${limit}_${offset}_${unreadOnly}_${type}`;
+    const cacheKey = `${limit}_${offset}_${unreadOnly}_${type}`;
 
-    if (offset === 0 && this._isFresh(this._cache.notificationsTime, this.CACHE_TTL_LIST)) {
-      return this._cache.notifications;
+    if (offset === 0 && this._isFresh(this._cache.notificationsTime[cacheKey] || 0, this.CACHE_TTL_LIST)) {
+      return this._cache.notifications[cacheKey];
     }
 
     if (this._cache.inProgress[cacheKey]) {
@@ -69,12 +69,12 @@ class NotificationService {
         offset: response?.offset || offset,
       };
       if (offset === 0) {
-        this._cache.notifications = result;
-        this._cache.notificationsTime = Date.now();
+        this._cache.notifications[cacheKey] = result;
+        this._cache.notificationsTime[cacheKey] = Date.now();
       }
       return result;
     } catch {
-      if (offset === 0 && this._cache.notifications) return this._cache.notifications;
+      if (offset === 0 && this._cache.notifications[cacheKey]) return this._cache.notifications[cacheKey];
       return { results: [], total: 0, limit, offset };
     } finally {
       delete this._cache.inProgress[cacheKey];
@@ -132,6 +132,7 @@ class NotificationService {
     upload_request_completed: 'BarChart3',
     upload_request_cancelled: 'XCircle',
     upload_request_comment: 'MessageSquare',
+    feedback_submitted: 'MessageSquare',
   };
 
   static NOTIFICATION_COLORS = {
@@ -152,6 +153,7 @@ class NotificationService {
     upload_request_completed: 'text-green-400',
     upload_request_cancelled: 'text-gray-400',
     upload_request_comment: 'text-yellow-400',
+    feedback_submitted: 'text-green-400',
   };
 }
 

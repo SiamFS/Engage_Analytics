@@ -13,6 +13,12 @@ import {
   Shield,
   UserPlus,
   Megaphone,
+  Upload,
+  CheckCircle,
+  XCircle,
+  RefreshCw,
+  BarChart3,
+  MessageSquare,
   CheckCheck,
   Trash2,
   Loader2,
@@ -27,6 +33,7 @@ import NotificationService from '../../../utils/NotificationService';
 
 const ICON_MAP = {
   Heart, Camera, Brain, CheckCircle2, Award, EyeOff, Lock, Shield, UserPlus, Megaphone,
+  Upload, CheckCircle, XCircle, RefreshCw, BarChart3, MessageSquare,
 };
 
 const ICON_COLORS = {
@@ -40,6 +47,14 @@ const ICON_COLORS = {
   user_promoted: 'text-blue-400 bg-blue-500/10',
   new_user_registered: 'text-green-400 bg-green-500/10',
   system_announcement: 'text-pink-400 bg-pink-500/10',
+  upload_request_submitted: 'text-blue-400 bg-blue-500/10',
+  upload_request_approved: 'text-green-400 bg-green-500/10',
+  upload_request_rejected: 'text-red-400 bg-red-500/10',
+  upload_request_processing: 'text-purple-400 bg-purple-500/10',
+  upload_request_completed: 'text-green-400 bg-green-500/10',
+  upload_request_cancelled: 'text-gray-400 bg-gray-500/10',
+  upload_request_comment: 'text-yellow-400 bg-yellow-500/10',
+  feedback_submitted: 'text-green-400 bg-green-500/10',
 };
 
 const TYPE_LABELS = {
@@ -165,40 +180,21 @@ const NotificationCenter = () => {
         setConfirmDelete(null);
       }
     } else if (confirmDelete === 'selected') {
-      for (const id of selectedIds) {
-        try { await NotificationService.deleteNotification(id); } catch { /* skip */ }
-      }
+      const ids = Array.from(selectedIds);
+      await Promise.allSettled(ids.map((id) => NotificationService.deleteNotification(id)));
       setNotifications((prev) => prev.filter((n) => !selectedIds.has(n.id)));
-      setTotal((prev) => prev - selectedIds.size);
+      setTotal((prev) => Math.max(0, prev - selectedIds.size));
       setSelectedIds(new Set());
       setConfirmDelete(null);
     }
   };
 
   const handleMarkSelectedRead = async () => {
-    for (const id of selectedIds) {
-      try {
-        await NotificationService.markAsRead(id);
-      } catch {
-        // skip
-      }
-    }
+    const ids = Array.from(selectedIds);
+    await Promise.allSettled(ids.map((id) => NotificationService.markAsRead(id)));
     setNotifications((prev) =>
       prev.map((n) => (selectedIds.has(n.id) ? { ...n, is_read: true } : n))
     );
-    setSelectedIds(new Set());
-  };
-
-  const handleDeleteSelected = async () => {
-    for (const id of selectedIds) {
-      try {
-        await NotificationService.deleteNotification(id);
-      } catch {
-        // skip
-      }
-    }
-    setNotifications((prev) => prev.filter((n) => !selectedIds.has(n.id)));
-    setTotal((prev) => prev - selectedIds.size);
     setSelectedIds(new Set());
   };
 
@@ -360,12 +356,16 @@ const NotificationCenter = () => {
                     <button
                       onClick={async (e) => {
                         e.stopPropagation();
-                        await NotificationService.markAsRead(notification.id);
-                        setNotifications((prev) =>
-                          prev.map((n) =>
-                            n.id === notification.id ? { ...n, is_read: true } : n
-                          )
-                        );
+                        try {
+                          await NotificationService.markAsRead(notification.id);
+                          setNotifications((prev) =>
+                            prev.map((n) =>
+                              n.id === notification.id ? { ...n, is_read: true } : n
+                            )
+                          );
+                        } catch {
+                          // silently fail — user sees no visual change
+                        }
                       }}
                       className="p-1.5 text-gray-500 hover:text-green-400 hover:bg-surface-600 rounded-lg transition-colors"
                       title="Mark as read"

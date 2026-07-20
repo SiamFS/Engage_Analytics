@@ -73,7 +73,7 @@ const NavigationBar = () => {
   const renderUserMenu = () => {
     if (!showUserMenu) return null;
     return (
-      <div className="absolute right-0 mt-2 w-48 py-2 bg-elevated border border-elevated-border rounded-xl shadow-elevated z-50">
+      <div className="absolute right-0 mt-2 w-48 py-2 bg-elevated border border-elevated-border rounded-xl shadow-elevated z-[60]">
         <div className="px-4 py-2 border-b border-elevated-border">
           <p className="text-sm font-semibold text-white">
             {user.firstName ? `${user.firstName} ${user.lastName}` : user.displayName}
@@ -165,7 +165,7 @@ const NavigationBar = () => {
       isScrolled ? 'bg-surface/95 backdrop-blur-md shadow-lg' : 'bg-transparent'
     }`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+        <div className="flex justify-between items-center h-16 overflow-visible">
           <Link to="/" className="flex items-center space-x-2">
             <div className="flex items-center justify-center w-8 h-8 bg-brand-600 rounded-lg shadow-md">
               <BarChart3 size={18} className="text-white" />
@@ -174,7 +174,7 @@ const NavigationBar = () => {
           </Link>
           {user && (
             <div className="hidden md:block flex-1 max-w-md mx-10">
-              <SearchBar />
+              <SearchBar showCategoryTiles={false} />
             </div>
           )}
           <div className="flex items-center space-x-6">

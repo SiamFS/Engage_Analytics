@@ -133,7 +133,7 @@ class AdminNotificationListView(APIView):
             qs = qs.filter(recipient_id=recipient_id)
         total = qs.count()
         notifications = qs.select_related("recipient")[offset : offset + limit]
-        serializer = NotificationSerializer(notifications, many=True)
+        serializer = NotificationSerializer(notifications, many=True, context={"reveal_recipient": True})
         return Response({
             "results": serializer.data,
             "total": total,

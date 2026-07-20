@@ -10,22 +10,25 @@ const NotificationBell = () => {
   const [loading, setLoading] = useState(true);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
+  const initialLoadDone = useRef(false);
 
-  const fetchCount = useCallback(async () => {
-    setLoading(true);
+  const fetchCount = useCallback(async (forceRefresh = false) => {
+    if (!initialLoadDone.current) setLoading(true);
     try {
-      const count = await NotificationService.getUnreadCount(true);
+      const count = await NotificationService.getUnreadCount(forceRefresh);
+      if (initialLoadDone.current && count === undefined) return;
       setUnreadCount(count);
     } catch {
       // silently fail
     } finally {
       setLoading(false);
+      initialLoadDone.current = true;
     }
   }, []);
 
   useEffect(() => {
-    fetchCount();
-    const interval = setInterval(fetchCount, 30000);
+    fetchCount(true);
+    const interval = setInterval(() => fetchCount(true), 30000);
     return () => clearInterval(interval);
   }, [fetchCount]);
 
@@ -63,7 +66,7 @@ const NotificationBell = () => {
         aria-expanded={isOpen}
       >
         <Bell size={20} />
-        {!loading && unreadCount > 0 && (
+        {unreadCount > 0 && (
           <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold leading-none text-white bg-red-500 rounded-full min-w-[18px] min-h-[18px]">
             {displayCount}
           </span>

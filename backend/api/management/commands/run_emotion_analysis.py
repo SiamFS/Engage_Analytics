@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand
 
 from api.services import EmotionAnalysisService
+from api.services.notification_service import NotificationService
 
 
 class Command(BaseCommand):
@@ -23,3 +24,7 @@ class Command(BaseCommand):
             f"Emotion analysis finished: status={run_log.status} "
             f"processed={run_log.processed}/{run_log.total}"
         )
+
+        self.stdout.write("Cleaning up old notifications...")
+        deleted = NotificationService.cleanup_old_notifications(days=90)
+        self.stdout.write(f"Deleted {deleted} old notifications.")
