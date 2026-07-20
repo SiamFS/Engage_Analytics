@@ -47,6 +47,7 @@ const UploadVideo = () => {
   const [thumbnailPreviewUrl, setThumbnailPreviewUrl] = useState(null);
   const [thumbDimensions, setThumbDimensions] = useState({ width: 0, height: 0 });
   const [isAutoCropping, setIsAutoCropping] = useState(false);
+  const [isGeneratingThumb, setIsGeneratingThumb] = useState(false);
   const [uploadStage, setUploadStage] = useState('preparing');
   const [rewardInfo, setRewardInfo] = useState(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -264,6 +265,7 @@ const UploadVideo = () => {
       setTimeout(() => setStatusMessage(''), 5000);
       handleThumbnailChangeWithFile(thumbnailFile);
     }
+    setIsGeneratingThumb(false);
   };
 
   const handleVideoSeeked = (video) => {
@@ -278,6 +280,7 @@ const UploadVideo = () => {
   };
 
   const generateThumbnailFromVideo = (videoFile) => {
+    setIsGeneratingThumb(true);
     const video = document.createElement('video');
     video.preload = 'metadata';
     
@@ -289,6 +292,7 @@ const UploadVideo = () => {
     
     video.onerror = () => {
       console.error('Error extracting thumbnail from video');
+      setIsGeneratingThumb(false);
     };
     
     try {
@@ -681,8 +685,8 @@ const UploadVideo = () => {
         <Button type="button" onClick={() => { setCurrentStep(1); setUploadStatus(null); setStatusMessage(''); }} disabled={uploadStatus === 'uploading'} className="border border-elevated-border bg-surface-600 text-gray-300 hover:bg-surface-500 focus:ring-0">
           <ArrowLeft className="mr-2 h-5 w-5" /> Back to Details
         </Button>
-        <Button type="submit" disabled={!videoFile || (!thumbnailFile && !processedThumbnailFile) || !uploadUrls.videoUrl || !uploadUrls.thumbnailUrl || uploadStatus === 'uploading' || isAutoCropping} className="bg-brand-600 hover:bg-brand-700 text-white disabled:opacity-50 focus:ring-0" isProcessing={uploadStatus === 'uploading' || isAutoCropping} processingSpinner={<Spinner size="sm" />}>
-          {uploadStatus === 'uploading' ? 'Uploading...' : (<><UploadIcon className="mr-2 h-5 w-5" /> Start Upload</>)}
+        <Button type="submit" disabled={!videoFile || (!thumbnailFile && !processedThumbnailFile) || !uploadUrls.videoUrl || !uploadUrls.thumbnailUrl || uploadStatus === 'uploading'} className="bg-brand-600 hover:bg-brand-700 text-white disabled:opacity-50 focus:ring-0" isProcessing={uploadStatus === 'uploading'} processingSpinner={<Spinner size="sm" />}>
+          {uploadStatus === 'uploading' ? 'Uploading...' : isGeneratingThumb ? (<><Spinner size="sm" className="mr-2" /> Generating thumbnail...</>) : (<><UploadIcon className="mr-2 h-5 w-5" /> Start Upload</>)}
         </Button>
       </div>
     </form>
