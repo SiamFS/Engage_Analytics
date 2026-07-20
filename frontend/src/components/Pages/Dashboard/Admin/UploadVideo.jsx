@@ -265,7 +265,6 @@ const UploadVideo = () => {
       setTimeout(() => setStatusMessage(''), 5000);
       handleThumbnailChangeWithFile(thumbnailFile);
     }
-    setIsGeneratingThumb(false);
   };
 
   const handleVideoSeeked = (video) => {
@@ -283,33 +282,33 @@ const UploadVideo = () => {
     setIsGeneratingThumb(true);
     const video = document.createElement('video');
     video.preload = 'metadata';
+    video.crossOrigin = 'anonymous';
+    let cleanedUp = false;
     
+    const cleanup = () => {
+      if (cleanedUp) return;
+      cleanedUp = true;
+      URL.revokeObjectURL(video.src);
+      video.remove();
+      setIsGeneratingThumb(false);
+    };
+
     video.onloadedmetadata = () => {
-      video.currentTime = video.duration * 0.25;
+      const t = (video.duration && video.duration > 0) ? video.duration * 0.25 : 0;
+      video.currentTime = t;
     };
     
-    video.onseeked = () => handleVideoSeeked(video);
+    video.onseeked = () => {
+      handleVideoSeeked(video);
+      cleanup();
+    };
     
     video.onerror = () => {
       console.error('Error extracting thumbnail from video');
-      setIsGeneratingThumb(false);
+      cleanup();
     };
     
-    try {
-      const videoUrl = URL.createObjectURL(videoFile);
-      if (validateUrl(videoUrl)) {
-        video.src = videoUrl;
-        
-        video.addEventListener('loadeddata', () => { URL.revokeObjectURL(videoUrl); }, { once: true });
-        video.addEventListener('error', () => { URL.revokeObjectURL(videoUrl); }, { once: true });
-      } else {
-        throw new Error('Invalid URL format');
-      }
-    } catch (error) {
-      console.error('Error creating video preview:', error);
-      setStatusMessage('Failed to generate thumbnail from video.');
-      setUploadStatus('error');
-    }
+    video.src = URL.createObjectURL(videoFile);
   };
 
   const handleThumbnailChange = (e) => {
