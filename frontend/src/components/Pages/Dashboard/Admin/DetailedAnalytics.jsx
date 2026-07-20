@@ -138,7 +138,7 @@ const DetailedAnalytics = () => {
     setIsRunning(true);
     setError(null);
     try {
-      await VideoService.runEmotionAnalysis();
+      await VideoService.runEmotionAnalysis(selectedVideoId);
       loadRunStatus();
       const timer = setInterval(async () => {
         try {

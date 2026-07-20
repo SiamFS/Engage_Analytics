@@ -641,8 +641,9 @@ class VideoService {
    * Trigger a manual emotion analysis run (admin only)
    * @returns {Object} Run start result
    */
-  static async runEmotionAnalysis() {
-    return await ApiService.post('admin/run-emotion-analysis/', {});
+  static async runEmotionAnalysis(videoId = null) {
+    const payload = videoId ? { video_id: videoId } : {};
+    return await ApiService.post('admin/run-emotion-analysis/', payload);
   }
 
   /**

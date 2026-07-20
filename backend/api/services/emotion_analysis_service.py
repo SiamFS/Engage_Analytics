@@ -29,7 +29,7 @@ CANONICAL = {e.lower(): e for e in EMOTION_CLASSES}
 
 class EmotionAnalysisService:
     @classmethod
-    def run(cls, trigger: str = "cron") -> AnalysisRunLog:
+    def run(cls, trigger: str = "cron", video_id: int = None) -> AnalysisRunLog:
         statuses = ["pending", "failed"] if trigger == "manual" else ["pending"]
 
         run_log = AnalysisRunLog.objects.create(trigger=trigger, status="running", total=0)
@@ -38,7 +38,7 @@ class EmotionAnalysisService:
         failed_count = 0
 
         try:
-            candidates = cls._claim_recordings(statuses)
+            candidates = cls._claim_recordings(statuses, video_id=video_id)
 
             run_log.total = len(candidates)
             run_log.save(update_fields=["total"])
@@ -95,7 +95,7 @@ class EmotionAnalysisService:
         return run_log
 
     @classmethod
-    def _claim_recordings(cls, statuses: List[str]) -> List[WebcamRecording]:
+    def _claim_recordings(cls, statuses: List[str], video_id: int = None) -> List[WebcamRecording]:
         with transaction.atomic():
             stale = timezone.now() - timedelta(minutes=60)
             orphaned = WebcamRecording.objects.select_for_update(skip_locked=True).filter(
@@ -106,11 +106,13 @@ class EmotionAnalysisService:
             if orphaned.exists():
                 orphaned.update(analysis_status="pending", analysis_started_at=None)
 
-            candidates = list(
-                WebcamRecording.objects.select_for_update(skip_locked=True).filter(
-                    upload_status="completed", analysis_status__in=statuses
-                )
+            base_qs = WebcamRecording.objects.select_for_update(skip_locked=True).filter(
+                upload_status="completed", analysis_status__in=statuses
             )
+            if video_id is not None:
+                base_qs = base_qs.filter(video_id=video_id)
+
+            candidates = list(base_qs)
             now = timezone.now()
             for recording in candidates:
                 if recording.analysis_attempts >= 3:

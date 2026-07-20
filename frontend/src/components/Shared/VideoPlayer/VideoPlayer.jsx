@@ -6,7 +6,7 @@ import WebcamRecorder from './WebcamRecorder';
 
 const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded, onPlay, videoId, onUploadFlowDone }) => {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(autoPlay);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -298,6 +298,7 @@ const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded,
         poster={thumbnailUrl}
         preload="metadata"
         playsInline
+        muted={autoPlay}
         onClick={togglePlay}
         title={title}
       >

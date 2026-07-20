@@ -664,9 +664,11 @@ class RunEmotionAnalysisView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated, IsAdmin]
 
     def post(self, request):
+        video_id = request.data.get("video_id") or None
+
         def _run():
             try:
-                EmotionAnalysisService.run(trigger="manual")
+                EmotionAnalysisService.run(trigger="manual", video_id=video_id)
             except Exception:
                 logger.exception("Manual emotion analysis run failed")
             finally:
