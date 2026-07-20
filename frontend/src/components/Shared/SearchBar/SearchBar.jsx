@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import PropTypes from 'prop-types';
 import { 
@@ -11,10 +11,12 @@ import {
 } from "lucide-react";
 import VideoService from "../../../utils/VideoService";
 import ApiService from "../../../utils/ApiService";
+import { AuthContext } from "../../../contexts/AuthProvider/AuthProvider";
 
 const MAX_HISTORY = 5;
 const MAX_SUGGESTIONS = 6;
 const MAX_CATEGORY_TILES = 8;
+const MAX_TITLES_SCANNED = 200;
 
 const SearchBar = ({ 
   className = "", 
@@ -38,10 +40,15 @@ const SearchBar = ({
   const searchRef = useRef(null);
   const suggestionBoxRef = useRef(null);
   const navigate = useNavigate();
+  const { user } = useContext(AuthContext);
+  const isAuthenticated = Boolean(user);
   
   useEffect(() => {
     loadSearchHistory();
     loadTrendingSearches();
+  }, []);
+
+  useEffect(() => {
     if (showCategoryTiles) {
       fetchRecommendedCategories();
     }
@@ -89,7 +96,28 @@ const SearchBar = ({
     }
   };
   
-  const loadTrendingSearches = () => {
+  const loadTrendingSearches = async () => {
+    try {
+      const trendingVideos = await ApiService.get('trending-videos/?limit=10');
+      if (Array.isArray(trendingVideos) && trendingVideos.length > 0) {
+        const terms = new Set();
+        trendingVideos.forEach(v => {
+          if (v.title) {
+            v.title.toLowerCase().split(/\s+/).filter(w => w.length > 3).forEach(w => terms.add(w));
+          }
+          if (v.category && v.category.trim()) {
+            terms.add(v.category.trim().toLowerCase());
+          }
+        });
+        const sorted = Array.from(terms).slice(0, 5);
+        if (sorted.length > 0) {
+          setTrendingSearches(sorted);
+          return;
+        }
+      }
+    } catch {
+      // fallback to defaults
+    }
     setTrendingSearches([
       "popular videos", 
       "latest uploads",
@@ -139,128 +167,230 @@ const SearchBar = ({
     
     try {
       const allVideos = await VideoService.getVideoFeed();
-      
-      if (Array.isArray(allVideos)) {
-        const processedSuggestions = generateSuggestions(allVideos, query);
-        setSuggestions(processedSuggestions);
+      const clientSuggestions = Array.isArray(allVideos)
+        ? generateSuggestions(allVideos, query)
+        : [];
+
+      if (clientSuggestions.length >= 3) {
+        setSuggestions(clientSuggestions);
+      } else if (isAuthenticated) {
+        try {
+          const searchResp = await ApiService.get(
+            `search/videos/?filename=${encodeURIComponent(query)}`
+          );
+          const backendResults = Array.isArray(searchResp) ? searchResp : [];
+          const merged = new Map();
+          clientSuggestions.forEach((s, i) => merged.set(s, { text: s, score: 2000 - i }));
+          backendResults.slice(0, MAX_SUGGESTIONS).forEach(v => {
+            const text = v.title || v.filename || '';
+            if (text && !merged.has(text)) {
+              merged.set(text, { text, score: 500 });
+            }
+          });
+          const sorted = Array.from(merged.values())
+            .sort((a, b) => b.score - a.score)
+            .slice(0, MAX_SUGGESTIONS)
+            .map(e => e.text);
+          setSuggestions(sorted);
+        } catch {
+          setSuggestions(clientSuggestions);
+        }
+      } else {
+        setSuggestions(clientSuggestions);
       }
     } catch (e) {
       console.error("Error fetching suggestions:", e);
+      if (isAuthenticated) {
+        try {
+          const searchResp = await ApiService.get(
+            `search/videos/?filename=${encodeURIComponent(query)}`
+          );
+          const backendResults = Array.isArray(searchResp) ? searchResp : [];
+          setSuggestions(backendResults.slice(0, MAX_SUGGESTIONS).map(v => v.title || v.filename).filter(Boolean));
+        } catch {
+          setSuggestions([]);
+        }
+      } else {
+        setSuggestions([]);
+      }
     } finally {
       setIsLoading(false);
     }
   };
-  
+
+  const levenshtein = (a, b) => {
+    const m = a.length, n = b.length;
+    if (m === 0) return n;
+    if (n === 0) return m;
+    let prev = Array.from({ length: n + 1 }, (_, i) => i);
+    let curr = Array(n + 1);
+    for (let i = 1; i <= m; i++) {
+      curr[0] = i;
+      for (let j = 1; j <= n; j++) {
+        curr[j] = a[i - 1] === b[j - 1] ? prev[j - 1] : 1 + Math.min(prev[j], curr[j - 1], prev[j - 1]);
+      }
+      [prev, curr] = [curr, prev];
+    }
+    return prev[n];
+  };
+
+  // --- TIER 1: Exact/strict matches (scores 2000-2999) ---
+  const scoreExactTitle = (text, queryLower) => {
+    if (text === queryLower) return 2100;
+    const words = text.split(/\s+/);
+    if (words.some(w => w === queryLower)) return 2080;
+    if (words.some(w => w.startsWith(queryLower) && w.length <= queryLower.length + 3)) return 2060;
+    if (text.includes(queryLower)) return 2040;
+    return 0;
+  };
+
+  const scoreExactCategory = (category, queryLower) => {
+    const words = category.split(/[\s-]+/);
+    if (words.some(w => w === queryLower)) return 2020;
+    if (words.some(w => w.startsWith(queryLower))) return 2010;
+    if (category.includes(queryLower)) return 2000;
+    return 0;
+  };
+
+  const scoreExactUploader = (uploader, queryLower) => {
+    const parts = uploader.split(/[\s@.]+/);
+    if (parts.some(p => p === queryLower)) return 1990;
+    if (parts.some(p => p.startsWith(queryLower))) return 1980;
+    return 0;
+  };
+
+  // --- TIER 2: Fuzzy matches (scores 1000-1999) ---
+  const scoreWordMatch = (word, queryLower) => {
+    if (word.length < 3 || queryLower.length < 3) return 0;
+    const dist = levenshtein(queryLower, word.substring(0, Math.min(word.length, queryLower.length + 2)));
+    if (dist === 1) return 1600;
+    if (dist === 2 && queryLower.length >= 4) return 1500;
+    if (queryLower.length >= 4) {
+      const sub = queryLower.substring(0, queryLower.length - 1);
+      if (word.includes(sub) || word.startsWith(sub)) return 1400;
+    }
+    return 0;
+  };
+
+  const scoreFuzzyTitle = (title, queryLower) => {
+    const words = title.split(/\s+/);
+    let best = 0;
+    for (const word of words) {
+      const s = scoreWordMatch(word, queryLower);
+      if (s > best) best = s;
+    }
+    if (best > 0) return best;
+    for (const word of words) {
+      if (word.length < 3 || queryLower.length < 3) continue;
+      if (word.includes(queryLower.substring(0, Math.min(queryLower.length, word.length)))) return 1300;
+    }
+    return 0;
+  };
+
+  const scoreFuzzyCategory = (category, queryLower) => {
+    const words = category.split(/[\s-]+/);
+    for (const word of words) {
+      const s = scoreWordMatch(word, queryLower);
+      if (s > 0) return s - 300;
+    }
+    return 0;
+  };
+
+  const scoreFuzzyUploader = (uploader, queryLower) => {
+    const parts = uploader.split(/[\s@.]+/);
+    for (const part of parts) {
+      const s = scoreWordMatch(part, queryLower);
+      if (s > 0) return s - 500;
+    }
+    return 0;
+  };
+
+  // --- TIER 3: Semantic/backend matches (scores 100-999) ---
+  // Handled in fetchSuggestions — backend results get score 500
+
   const extractSearchTerms = (videos) => {
-    const terms = {
-      titles: [],
-      categories: [],
-      uploaders: []
-    };
-    
+    const terms = { titles: [], categories: [], uploaders: [] };
     videos.forEach(video => {
       if (video.title) terms.titles.push(video.title.toLowerCase());
       if (video.category) terms.categories.push(video.category.toLowerCase());
       if (video.uploader_name) terms.uploaders.push(video.uploader_name.toLowerCase());
     });
-    
     return terms;
-  };
-
-  const scoreMatches = (text, query, baseScore) => {
-    if (text.includes(query) && text !== query) {
-      return baseScore;
-    }
-    return 0;
   };
 
   const generateSuggestions = (videos, query) => {
     const queryLower = query.toLowerCase();
     const queryTerms = queryLower.split(/\s+/).filter(t => t.length > 0);
     const terms = extractSearchTerms(videos);
-    
-    const matchScores = [];
-    
-    terms.titles.forEach(title => {
-      const score = scoreMatches(title, queryLower, 100);
-      if (score > 0) matchScores.push({ text: title, score });
-    });
-    
-    terms.categories.forEach(category => {
-      const score = scoreMatches(category, queryLower, 60);
-      if (score > 0) matchScores.push({ text: category, score });
-    });
-    
-    terms.uploaders.forEach(uploader => {
-      const score = scoreMatches(uploader, queryLower, 50);
-      if (score > 0) matchScores.push({ text: uploader, score });
-    });
-    
-    if (queryTerms.length > 0) {
-      processPartialMatches(terms.titles, queryTerms, matchScores);
-    }
-    
-    const uniqueMatches = deduplicateSuggestions(matchScores);
-    
-    const sortedMatches = [...uniqueMatches].sort((a, b) => b.score - a.score);
-    
-    return sortedMatches
-      .slice(0, MAX_SUGGESTIONS)
-      .map(item => item.text);
-  };
-  
-  const processPartialMatches = (terms, queryTerms, results) => {
-    terms.forEach(term => {
-      const words = term.split(/\s+/);
-      checkQueryTermMatches(words, queryTerms, term, results);
-    });
-  };
-  
-  const checkQueryTermMatches = (words, queryTerms, term, results) => {
-    for (const queryTerm of queryTerms) {
-      if (queryTerm.length < 3) continue;
-      checkWordsForMatch(words, queryTerm, term, results);
-    }
-  };
-  
-  const checkWordsForMatch = (words, queryTerm, term, results) => {
-    for (const word of words) {
-      const matchFound = checkSingleWordMatch(word, queryTerm, term, results);
-      if (matchFound) break;
-    }
-  };
-  
-  const checkSingleWordMatch = (word, queryTerm, term, results) => {
-    if (word.startsWith(queryTerm)) {
-      results.push({ text: term, score: 90 });
-      return true;
-    }
-    
-    if (word.includes(queryTerm) && word !== queryTerm) {
-      results.push({ text: term, score: 80 });
-      return true;
-    }
-    
-    if (queryTerm.length > 3 && word.includes(queryTerm.substring(0, queryTerm.length - 1))) {
-      results.push({ text: term, score: 70 });
-      return true;
-    }
-    
-    return false;
-  };
-  
-  const deduplicateSuggestions = (suggestions) => {
-    const uniqueSuggestions = [];
-    const seen = new Set();
-    
-    suggestions.forEach(item => {
-      if (!seen.has(item.text)) {
-        seen.add(item.text);
-        uniqueSuggestions.push(item);
+    const matchScores = new Map();
+
+    const addMatch = (text, score) => {
+      const existing = matchScores.get(text) || 0;
+      matchScores.set(text, Math.max(existing, score));
+    };
+
+    const scanTitles = terms.titles.slice(0, MAX_TITLES_SCANNED);
+    const scanCategories = [...new Set(terms.categories)].slice(0, 100);
+    const scanUploaders = [...new Set(terms.uploaders)].slice(0, 50);
+
+    // Tier 1: Exact matches per title word
+    for (const title of scanTitles) {
+      const s = scoreExactTitle(title, queryLower);
+      if (s > 0) { addMatch(title, s); continue; }
+      for (const qt of queryTerms) {
+        const ws = scoreExactTitle(title, qt);
+        if (ws > 0) addMatch(title, ws - 50);
       }
-    });
-    
-    return uniqueSuggestions;
+      if (matchScores.size >= MAX_SUGGESTIONS * 3) break;
+    }
+
+    // Tier 1: Exact matches for categories
+    for (const category of scanCategories) {
+      const s = scoreExactCategory(category, queryLower);
+      if (s > 0) { addMatch(category, s); continue; }
+      for (const qt of queryTerms) {
+        const ws = scoreExactCategory(category, qt);
+        if (ws > 0) addMatch(category, ws - 50);
+      }
+    }
+
+    // Tier 1: Exact matches for uploaders  
+    for (const uploader of scanUploaders) {
+      const s = scoreExactUploader(uploader, queryLower);
+      if (s > 0) { addMatch(uploader, s); }
+    }
+
+    // Tier 2: Fuzzy matches for titles (only if not enough exact matches)
+    const exactCount = matchScores.size;
+    if (exactCount < MAX_SUGGESTIONS) {
+      for (const title of scanTitles) {
+        if (matchScores.has(title)) continue;
+        const s = scoreFuzzyTitle(title, queryLower);
+        if (s > 0) addMatch(title, s);
+        for (const qt of queryTerms) {
+          const ws = scoreFuzzyTitle(title, qt);
+          if (ws > 0) addMatch(title, ws - 50);
+        }
+        if (matchScores.size >= MAX_SUGGESTIONS * 2) break;
+      }
+
+      for (const category of scanCategories) {
+        if (matchScores.has(category)) continue;
+        const s = scoreFuzzyCategory(category, queryLower);
+        if (s > 0) addMatch(category, s);
+      }
+
+      for (const uploader of scanUploaders) {
+        if (matchScores.has(uploader)) continue;
+        const s = scoreFuzzyUploader(uploader, queryLower);
+        if (s > 0) addMatch(uploader, s);
+      }
+    }
+
+    return Array.from(matchScores.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, MAX_SUGGESTIONS)
+      .map(([text]) => text);
   };
   
   const handleSubmit = (e) => {
@@ -302,11 +432,11 @@ const SearchBar = ({
   };
   
   const renderSuggestionsList = () => {
-    if (!showSuggestions || !searchRef.current) return null;
+    if (!showSuggestions) return null;
     
     return (
       <div 
-        className="absolute z-[60] mt-2 w-full bg-elevated rounded-lg shadow-xl border border-elevated-border py-2 max-h-96 overflow-y-auto"
+        className="absolute z-[60] mt-2 w-full bg-elevated rounded-lg shadow-xl border border-elevated-border py-2 max-h-80 overflow-y-auto custom-scrollbar"
         ref={suggestionBoxRef}
       >
         {isLoading && (
@@ -386,7 +516,7 @@ const SearchBar = ({
   };
   
   const renderCategoryTiles = () => {
-    if (isCategoriesLoading || !searchRef.current || !showSuggestions) {
+    if (isCategoriesLoading || !showSuggestions) {
       return null;
     }
     

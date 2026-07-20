@@ -73,7 +73,7 @@ const NavigationBar = () => {
   const renderUserMenu = () => {
     if (!showUserMenu) return null;
     return (
-      <div className="absolute right-0 mt-2 w-48 py-2 bg-elevated border border-elevated-border rounded-xl shadow-elevated z-[60]">
+      <div className="absolute right-0 top-full mt-1 w-48 py-2 bg-elevated border border-elevated-border rounded-xl shadow-elevated z-[60]">
         <div className="px-4 py-2 border-b border-elevated-border">
           <p className="text-sm font-semibold text-white">
             {user.firstName ? `${user.firstName} ${user.lastName}` : user.displayName}
