@@ -151,7 +151,7 @@ const NotificationDropdown = ({ onClose, onViewAll, onCountUpdate }) => {
   };
 
   return (
-    <div className="absolute right-0 top-full mt-1 w-[360px] sm:w-[400px] bg-gray-800 border border-gray-700 rounded-xl shadow-2xl z-[100] overflow-hidden">
+    <div className="absolute right-0 top-full mt-3 w-[360px] sm:w-[400px] bg-gray-800 border border-gray-700 rounded-xl shadow-2xl z-[100] overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
         <h3 className="text-sm font-semibold text-white flex items-center gap-2">
           <Bell size={16} className="text-blue-400" />

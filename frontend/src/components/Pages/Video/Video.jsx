@@ -1,9 +1,11 @@
-﻿import React, { useState, useEffect, useCallback, lazy, Suspense, useRef } from 'react';
+﻿import React, { useState, useEffect, useCallback, lazy, Suspense, useRef, useContext } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button, Spinner } from 'flowbite-react';
 import { Grid, List, ThumbsUp, Clock, ChevronDown, Filter, Eye, User } from 'lucide-react';
 import PropTypes from 'prop-types';
 import VideoDataService from '../../../utils/VideoDataService';
+import ApiService from '../../../utils/ApiService';
+import { AuthContext } from '../../../contexts/AuthProvider/AuthProvider';
 import { 
   LoadingState, 
   ErrorState, 
@@ -15,6 +17,53 @@ import SkeletonCard from '../../Shared/SkeletonCard/SkeletonCard';
 const AdCard = lazy(() => import('../../Shared/AdCard/AdCard'));
 
 const VIDEOS_PER_PAGE = 12;
+
+const levenshtein = (a, b) => {
+  const m = a.length, n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  let prev = Array.from({ length: n + 1 }, (_, i) => i);
+  let curr = Array(n + 1);
+  for (let i = 1; i <= m; i++) {
+    curr[0] = i;
+    for (let j = 1; j <= n; j++) {
+      curr[j] = a[i - 1] === b[j - 1] ? prev[j - 1] : 1 + Math.min(prev[j], curr[j - 1], prev[j - 1]);
+    }
+    [prev, curr] = [curr, prev];
+  }
+  return prev[n];
+};
+
+const fuzzyMatch = (text, query) => {
+  if (!text || !query) return 0;
+  const t = text.toLowerCase();
+  const q = query.toLowerCase();
+  if (t === q) return 100;
+  if (t.startsWith(q)) return 95;
+  if (t.includes(q)) return 85;
+  const words = t.split(/\s+/);
+  for (const word of words) {
+    if (word === q) return 90;
+    if (word.startsWith(q)) return 80;
+    if (word.includes(q)) return 70;
+  }
+  if (q.length >= 3) {
+    for (const word of words) {
+      if (word.length < 3) continue;
+      const dist = levenshtein(q, word.substring(0, Math.min(word.length, q.length + 2)));
+      if (dist === 1) return 60;
+      if (dist === 2 && q.length >= 4) return 50;
+    }
+    const sub = q.substring(0, q.length - 1);
+    if (sub.length >= 3) {
+      if (t.includes(sub)) return 45;
+      for (const word of words) {
+        if (word.includes(sub) || word.startsWith(sub)) return 40;
+      }
+    }
+  }
+  return 0;
+};
 
 const AdCardPlaceholder = () => <SkeletonCard rounded="rounded-xl" />
 
@@ -112,6 +161,8 @@ VideoListItem.propTypes = {
 const Video = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useContext(AuthContext);
+  const isAuthenticated = Boolean(user);
   const queryParams = new URLSearchParams(location.search);
   const initialCategory = queryParams.get('category') || '';
   const initialSortOption = queryParams.get('sort') || 'newest';
@@ -191,12 +242,20 @@ const Video = () => {
     let results = [...videos];
     
     if (query) {
-      results = results.filter(video => 
-        (video.title && video.title.toLowerCase().includes(query)) ||
-        (video.description && video.description.toLowerCase().includes(query)) ||
-        (video.uploader_name && video.uploader_name.toLowerCase().includes(query)) ||
-        (video.category && video.category.toLowerCase().includes(query))
-      );
+      results = results
+        .map(video => {
+          const scores = [
+            { video, score: fuzzyMatch(video.title || '', query) },
+            { video, score: fuzzyMatch(video.description || '', query) },
+            { video, score: fuzzyMatch(video.uploader_name || '', query) },
+            { video, score: fuzzyMatch(video.category || '', query) },
+          ];
+          const best = scores.reduce((max, s) => s.score > max.score ? s : max, scores[0]);
+          return { video, score: best.score };
+        })
+        .filter(item => item.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .map(item => item.video);
     }
     
     if (categoryFilter) {
@@ -256,6 +315,32 @@ const Video = () => {
     window.history.replaceState({}, '', newUrl);
     
   }, [videos, sortOption, categoryFilter, typeFilter, location.search, location.pathname, navigate]);
+
+  useEffect(() => {
+    const query = (new URLSearchParams(location.search).get('q') || '').toLowerCase();
+    if (!query || !isAuthenticated || filteredVideos.length > 0 || !videos.length) return;
+
+    let cancelled = false;
+    const searchBackend = async () => {
+      try {
+        const resp = await ApiService.get(`search/videos/?filename=${encodeURIComponent(query)}`);
+        if (cancelled || !Array.isArray(resp)) return;
+        const backend = resp.map(v => ({
+          ...VideoDataService.normalizeVideoData(v, v.id),
+          _semantic: true,
+        }));
+        if (backend.length > 0) {
+          setFilteredVideos(backend);
+          setDisplayedVideos(backend.slice(0, VIDEOS_PER_PAGE));
+          setHasMore(backend.length > VIDEOS_PER_PAGE);
+        }
+      } catch {
+        // silently fail
+      }
+    };
+    searchBackend();
+    return () => { cancelled = true; };
+  }, [filteredVideos.length, location.search, isAuthenticated, videos.length]);
   
   const loadMoreVideos = () => {
     if (!hasMore || loadingMore || filteredVideos.length === 0) return;

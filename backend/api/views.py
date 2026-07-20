@@ -512,7 +512,12 @@ class VideoSearchView(generics.ListAPIView):
         parts = filename.split("?")[0].split("/")
         base_filename = parts[-1] if parts else filename
 
-        videos = Video.objects.filter(video_url__contains=base_filename)
+        videos = Video.objects.filter(
+            Q(video_url__contains=base_filename)
+            | Q(title__icontains=base_filename)
+            | Q(description__icontains=base_filename)
+            | Q(category__icontains=base_filename)
+        )
 
         if self.request.user.role != "admin":
             videos = videos.filter(uploader=self.request.user)

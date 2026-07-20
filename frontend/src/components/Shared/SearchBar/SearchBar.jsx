@@ -436,7 +436,7 @@ const SearchBar = ({
     
     return (
       <div 
-        className="absolute z-[60] mt-2 w-full bg-elevated rounded-lg shadow-xl border border-elevated-border py-2 max-h-80 overflow-y-auto custom-scrollbar"
+        className="absolute left-0 right-0 top-full mt-2 w-full bg-elevated rounded-lg shadow-xl border border-elevated-border py-2 max-h-80 overflow-y-auto custom-scrollbar z-[60]"
         ref={suggestionBoxRef}
       >
         {isLoading && (

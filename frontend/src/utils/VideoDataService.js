@@ -6,6 +6,7 @@ export const normalizeVideoData = (video, index) => ({
   uuid: video.uuid || null,
   title: video.title || 'Untitled Video',
   description: video.description || '',
+  category: video.category || '',
   imageUrl: video.thumbnail_url || null,
   thumbnail_url: video.thumbnail_url || null,
   videoUrl: video.video_url || null,
