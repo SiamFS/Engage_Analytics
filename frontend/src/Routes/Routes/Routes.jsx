@@ -37,10 +37,11 @@ import UserManagement from "../../components/Pages/Dashboard/Admin/UserManagemen
 import { Navigate } from "react-router-dom";
 
 
-const router = createBrowserRouter([
-  {
-    path: "/",
-    element: <App />,
+const router = createBrowserRouter(
+  [
+    {
+      path: "/",
+      element: <App />,
     children: [
       {
         path: "/",
@@ -201,6 +202,11 @@ const router = createBrowserRouter([
       },
     ]
   }
-]);
+], {
+  future: {
+    v7_startTransition: true,
+    v7_relativeSplatPath: true,
+  },
+});
 
 export default router;

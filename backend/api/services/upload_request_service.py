@@ -63,9 +63,9 @@ class UploadRequestService:
         return list(requests), total
 
     @classmethod
-    def get_request_detail(cls, request_id, user=None):
+    def get_request_detail(cls, request_id, user):
         qs = UploadRequest.objects.select_related("company", "reviewed_by", "video").prefetch_related("status_logs__changed_by")
-        if user and user.role != "admin":
+        if user.role != "admin":
             qs = qs.filter(company=user)
         return qs.filter(id=request_id).first()
 
@@ -293,16 +293,14 @@ class UploadRequestService:
         total = qs.count()
         by_status = qs.values("status").annotate(count=Count("id"))
         status_counts = {item["status"]: item["count"] for item in by_status}
-
-        completed_qs = qs.filter(status="completed")
-        completed_count = completed_qs.count()
+        completed_count = status_counts.get("completed", 0)
 
         total_frames = 0
         if completed_count > 0:
-            video_ids = list(completed_qs.filter(video__isnull=False).values_list("video_id", flat=True))
-            if video_ids:
-                frame_count = EmotionFrame.objects.filter(video_id__in=video_ids).count()
-                total_frames = frame_count
+            total_frames = EmotionFrame.objects.filter(
+                video__upload_request__company=company,
+                video__upload_request__status="completed",
+            ).count()
 
         return {
             "total_requests": total,

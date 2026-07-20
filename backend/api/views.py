@@ -2,7 +2,7 @@ import uuid
 import logging
 import threading
 from django.conf import settings
-from django.db.models import F, Max
+from django.db.models import F, Max, Count, Q, Prefetch, Case, When, Value, IntegerField
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -143,7 +143,7 @@ class VideoDetailView(generics.RetrieveAPIView):
 
     def get_video_by_id(self, video_id):
         """Get video by numeric ID."""
-        return get_object_or_404(Video, id=int(video_id))
+        return get_object_or_404(Video.objects.select_related("uploader"), id=int(video_id))
 
     def get_video_by_token(self, token):
         """Get video by share token and update access count."""
@@ -345,12 +345,12 @@ class UserHistoryAPI(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = VideoDetailSerializer
 
-    def get_queryset(self):
-        user = self.request.user
-        limit = safe_int_param(self.request, "limit", 50, 1, 100)
-        offset = safe_int_param(self.request, "offset", 0, 0)
+    def list(self, request, *args, **kwargs):
+        user = request.user
+        limit = safe_int_param(request, "limit", 50, 1, 100)
+        offset = safe_int_param(request, "offset", 0, 0)
 
-        viewed_video_ids = (
+        video_ids = list(
             VideoView.objects.filter(viewer=user)
             .values("video_id")
             .annotate(last_viewed=Max("viewed_at"))
@@ -358,15 +358,20 @@ class UserHistoryAPI(generics.ListAPIView):
             .values_list("video_id", flat=True)
         )
 
-        if offset > 0:
-            viewed_video_ids = viewed_video_ids[offset:]
+        paginated_ids = video_ids[offset : offset + limit]
+        vids_map = Video.objects.select_related("uploader").in_bulk(paginated_ids)
+        ordered_videos = [vids_map[vid] for vid in paginated_ids if vid in vids_map]
 
-        return Video.objects.select_related("uploader").filter(id__in=viewed_video_ids)[:limit]
+        liked_ids = set(
+            VideoLike.objects.filter(user=user, video_id__in=paginated_ids).values_list(
+                "video_id", flat=True
+            )
+        )
 
-    def get_serializer_context(self):
-        context = super().get_serializer_context()
-        context["frontend_url"] = settings.FRONTEND_URL
-        return context
+        serializer = self.get_serializer(ordered_videos, many=True)
+        serializer.context["liked_video_ids"] = liked_ids
+        serializer.context["frontend_url"] = settings.FRONTEND_URL
+        return Response(serializer.data)
 
     def handle_exception(self, exc):
         """Convert any authentication-related exceptions to 401 status."""
@@ -383,26 +388,27 @@ class UserLikedVideosAPI(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = VideoDetailSerializer
 
-    def get_queryset(self):
-        user = self.request.user
-        limit = safe_int_param(self.request, "limit", 50, 1, 100)
-        offset = safe_int_param(self.request, "offset", 0, 0)
+    def list(self, request, *args, **kwargs):
+        user = request.user
+        limit = safe_int_param(request, "limit", 50, 1, 100)
+        offset = safe_int_param(request, "offset", 0, 0)
 
-        liked_video_ids = (
+        video_ids = list(
             VideoLike.objects.filter(user=user)
             .order_by("-liked_at")
             .values_list("video_id", flat=True)
         )
 
-        if offset > 0:
-            liked_video_ids = liked_video_ids[offset:]
+        paginated_ids = video_ids[offset : offset + limit]
+        vids_map = Video.objects.select_related("uploader").in_bulk(paginated_ids)
+        ordered_videos = [vids_map[vid] for vid in paginated_ids if vid in vids_map]
 
-        return Video.objects.select_related("uploader").filter(id__in=liked_video_ids)[:limit]
+        liked_ids = set(paginated_ids)
 
-    def get_serializer_context(self):
-        context = super().get_serializer_context()
-        context["frontend_url"] = settings.FRONTEND_URL
-        return context
+        serializer = self.get_serializer(ordered_videos, many=True)
+        serializer.context["liked_video_ids"] = liked_ids
+        serializer.context["frontend_url"] = settings.FRONTEND_URL
+        return Response(serializer.data)
 
 
 class UploadVideoView(generics.CreateAPIView):
@@ -479,16 +485,11 @@ class WebcamUploadView(generics.CreateAPIView):
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 )
 
-            profile, points_awarded = PointsService.award_points_for_webcam_upload(
-                request.user
-            )
-
             return Response(
                 {
                     "upload_url": upload_url,
                     "recording_id": recording.id,
-                    "message": f"Successfully generated upload link. {points_awarded} points awarded.",
-                    "total_points": profile.points,
+                    "message": "Successfully generated upload link.",
                 },
                 status=status.HTTP_201_CREATED,
             )
@@ -695,29 +696,31 @@ class VideoEmotionSummaryView(generics.GenericAPIView):
 
         summary = getattr(video, "emotion_summary", None)
         if not summary:
-            total_recordings = WebcamRecording.objects.filter(video=video).count()
-            completed_recordings = WebcamRecording.objects.filter(
-                video=video, upload_status="completed"
-            ).count()
-            failed_recordings = WebcamRecording.objects.filter(
-                video=video, analysis_status="failed"
-            ).count()
-            no_faces_recordings = WebcamRecording.objects.filter(
-                video=video, analysis_status="completed"
-            ).exclude(emotion_frames__isnull=True).count()
-            no_faces_recordings = WebcamRecording.objects.filter(
-                video=video, analysis_status="completed"
-            ).count() - no_faces_recordings
+            stats = WebcamRecording.objects.filter(video=video).aggregate(
+                total=Count("id"),
+                completed_analysis=Count("id", filter=Q(analysis_status="completed")),
+                failed_analysis=Count("id", filter=Q(analysis_status="failed")),
+                pending_analysis=Count("id", filter=Q(upload_status="completed", analysis_status="pending")),
+                completed_with_frames=Count(
+                    "id",
+                    filter=Q(analysis_status="completed", emotion_frames__isnull=False),
+                ),
+                completed_no_faces=Count(
+                    "id",
+                    filter=Q(analysis_status="completed", emotion_frames__isnull=True),
+                ),
+            )
             return Response(
                 {
                     "distribution": {e: 0.0 for e in EMOTION_CLASSES},
                     "timeline": [],
                     "total_frames": 0,
                     "analyzed_recordings": 0,
-                    "total_recordings": total_recordings,
-                    "completed_recordings": completed_recordings,
-                    "failed_recordings": failed_recordings,
-                    "no_faces_recordings": no_faces_recordings,
+                    "total_recordings": stats["total"] or 0,
+                    "completed_recordings": stats["completed_analysis"] or 0,
+                    "failed_recordings": stats["failed_analysis"] or 0,
+                    "pending_recordings": stats["pending_analysis"] or 0,
+                    "no_faces_recordings": stats["completed_no_faces"] or 0,
                 }
             )
         return Response(VideoEmotionSummarySerializer(summary).data)
@@ -734,11 +737,13 @@ class VideoEmotionRecordingsView(generics.GenericAPIView):
 
         recordings = WebcamRecording.objects.filter(
             video=video
-        ).prefetch_related("emotion_frames").order_by("-recording_date")
+        ).prefetch_related(
+            Prefetch("emotion_frames", queryset=EmotionFrame.objects.order_by("t_seconds"))
+        ).order_by("-recording_date")
 
         data = []
         for recording in recordings:
-            frames = list(recording.emotion_frames.all().order_by("t_seconds"))
+            frames = list(recording.emotion_frames.all())
 
             entry = {
                 "recording_id": recording.id,
@@ -785,7 +790,7 @@ class MyEmotionView(generics.GenericAPIView):
 
         frames = EmotionFrame.objects.filter(
             video=video, viewer=request.user
-        ).order_by("t_seconds")
+        ).select_related("recording").order_by("recording_id", "t_seconds")
 
         timeline = [_frame_to_dict(f) for f in frames]
         distribution = {e: 0.0 for e in EMOTION_CLASSES}
@@ -798,6 +803,34 @@ class MyEmotionView(generics.GenericAPIView):
             }
 
         return Response({"distribution": distribution, "timeline": timeline})
+
+
+class VideoRelatedView(generics.GenericAPIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, video_id):
+        video = get_object_or_404(Video, id=video_id)
+        limit = safe_int_param(request, "limit", 4, 1, 10)
+
+        related = (
+            Video._public_available_qs()
+            .filter(
+                Q(category=video.category) | Q(uploader=video.uploader)
+            )
+            .exclude(id=video.id)
+            .annotate(
+                relevance=Case(
+                    When(category=video.category, then=Value(2)),
+                    When(uploader=video.uploader, then=Value(1)),
+                    default=Value(0),
+                    output_field=IntegerField(),
+                )
+            )
+            .order_by("-relevance", "-views")[:limit]
+        )
+
+        serializer = VideoFeedSerializer(related, many=True)
+        return Response(serializer.data)
 
 
 class UserWebcamRecordingsView(generics.ListAPIView):
@@ -1008,11 +1041,13 @@ class CompanyAnalyticsView(APIView):
     def get(self, request):
         if request.user.role == "admin":
             company_id = request.query_params.get("company_id", None)
-            if company_id:
-                company = get_object_or_404(User, id=company_id, role="company")
-                data = UploadRequestService.get_company_analytics(company)
-            else:
-                data = UploadRequestService.get_company_analytics(request.user)
+            if not company_id:
+                return Response(
+                    {"error": "company_id query parameter is required for admin analytics"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            company = get_object_or_404(User, id=company_id, role="company")
+            data = UploadRequestService.get_company_analytics(company)
         else:
             data = UploadRequestService.get_company_analytics(request.user)
 

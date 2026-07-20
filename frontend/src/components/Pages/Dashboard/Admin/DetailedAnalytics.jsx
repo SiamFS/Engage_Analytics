@@ -463,6 +463,7 @@ const DetailedAnalytics = () => {
                               >
                                 {expanded === r.recording_id ? 'Hide' : 'Timeline'}
                               </Button>
+                              {isAdmin && (
                               <Button
                                 color="failure"
                                 size="xs"
@@ -471,6 +472,7 @@ const DetailedAnalytics = () => {
                               >
                                 <Trash2 size={14} />
                               </Button>
+                              )}
                             </div>
                           </Table.Cell>
                         </Table.Row>

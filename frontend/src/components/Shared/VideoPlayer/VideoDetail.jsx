@@ -285,42 +285,11 @@ const VideoDetail = () => {
     };
 
     const fetchRelatedVideos = async (currentVideo) => {
-      if (!currentVideo) return;
-
-      const currentId = currentVideo.id;
-      const currentCategory = currentVideo.category;
-      const currentUploaderEmail = currentVideo.uploader?.email;
+      if (!currentVideo?.id) return;
 
       try {
-        const videoFeedResult = VideoService.getVideoFeed();
-        const videoFeed = await (videoFeedResult instanceof Promise ? videoFeedResult : Promise.resolve(videoFeedResult));
-
-        if (!Array.isArray(videoFeed)) {
-          setRelatedVideos([]);
-          return;
-        }
-
-        const others = videoFeed.filter(v => v && v.id !== currentId);
-
-        const sameCategory = others.filter(v =>
-          currentCategory && v.category && v.category === currentCategory
-        );
-
-        const sameUploader = others.filter(v =>
-          currentUploaderEmail && v.uploader?.email === currentUploaderEmail && !sameCategory.some(sc => sc.id === v.id)
-        );
-
-        const scored = sameCategory.concat(sameUploader).map(v => ({
-          ...v,
-          _score: sameCategory.some(sc => sc.id === v.id) ? 1 : 0.5,
-        }));
-
-        scored.sort((a, b) => {
-          if (b._score !== a._score) return b._score - a._score;
-          return (b.views || 0) - (a.views || 0);
-        });
-
-        setRelatedVideos(scored.slice(0, 4));
+        const related = await VideoService.getRelatedVideos(currentVideo.id, 4);
+        setRelatedVideos(Array.isArray(related) ? related : []);
       } catch (relatedError) {
         console.error('Error fetching related videos:', relatedError);
         setRelatedVideos([]);

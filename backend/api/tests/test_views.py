@@ -607,10 +607,9 @@ class TestWebcamUploadView:
         assert response.status_code == status.HTTP_201_CREATED
         assert 'upload_url' in response.data
         assert 'recording_id' in response.data
-        assert 'points awarded' in response.data['message']
-        assert response.data['total_points'] == 5
+        assert response.data['message'] == 'Successfully generated upload link.'
         assert mock_generate_sas.call_count == 2
-        mock_award_points.assert_called_once_with(test_user)
+        mock_award_points.assert_not_called()
         assert WebcamRecording.objects.filter(video=test_video, recorder=test_user).exists()
 
     def test_webcam_upload_missing_filename(self, authenticated_client, test_video):

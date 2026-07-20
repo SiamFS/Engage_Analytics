@@ -52,7 +52,7 @@ class NotificationService:
         if notification_type:
             qs = qs.filter(notification_type=notification_type)
         total = qs.count()
-        qs = qs.select_related("recipient")[offset : offset + limit]
+        qs = qs[offset : offset + limit]
         return list(qs), total
 
     @classmethod

@@ -31,7 +31,7 @@ const AdminVideos = () => {
         setError(null);
         setFetchAttempted(true);
         
-        const response = await Promise.resolve(VideoService.adminGetAllVideos());
+        const response = await VideoService.adminGetAllVideos();
         
         if (isMounted.current) {
           const sortedVideos = response ? 

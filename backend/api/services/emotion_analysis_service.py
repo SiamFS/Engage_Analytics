@@ -113,6 +113,11 @@ class EmotionAnalysisService:
             )
             now = timezone.now()
             for recording in candidates:
+                if recording.analysis_attempts >= 3:
+                    recording.analysis_status = "failed"
+                    recording.analysis_error = "Max retry attempts exceeded"
+                    recording.analysis_started_at = now
+                    continue
                 recording.analysis_attempts += 1
                 recording.analysis_status = "processing"
                 recording.analysis_started_at = now
@@ -163,7 +168,10 @@ class EmotionAnalysisService:
             EmotionFrame.objects.filter(recording=recording).delete()
             EmotionFrame.objects.bulk_create(to_create, batch_size=100)
 
-            WebcamUploadService.generate_thumbnail(recording.id, video_path=video_path)
+            try:
+                WebcamUploadService.generate_thumbnail(recording.id, video_path=video_path)
+            except Exception:
+                logger.warning(f"Thumbnail generation failed for recording {recording.id}")
         finally:
             try:
                 os.unlink(video_path)
@@ -347,7 +355,7 @@ class EmotionAnalysisService:
             scores[canonical] += score
             total += score
         if total > 0:
-            scores = {k: v / total for k, v in scores.items()}
+            scores = {k: min(1.0, max(0.0, v / total)) for k, v in scores.items()}
         return scores
 
     @classmethod

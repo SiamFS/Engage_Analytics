@@ -46,8 +46,8 @@ const Dashboard = () => {
     const fetchDashboardData = async () => {
       try {
         const allVideos = user?.role === 'admin' ? 
-          await Promise.resolve(VideoService.adminGetAllVideos()) : 
-          await Promise.resolve(VideoService.getVideoFeed());
+          await VideoService.adminGetAllVideos() : 
+          await VideoService.getVideoFeed();
         
         if (!isMounted) return;
         

@@ -24,6 +24,13 @@ const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded,
   const webcamPermissionRef = useRef(null);
   const faceBlockedRef = useRef(false);
   const playbackStartedRef = useRef(false);
+  const onEndedRef = useRef(onEnded);
+  const onPlayRef = useRef(onPlay);
+  const onUploadFlowDoneRef = useRef(onUploadFlowDone);
+
+  useEffect(() => { onEndedRef.current = onEnded; }, [onEnded]);
+  useEffect(() => { onPlayRef.current = onPlay; }, [onPlay]);
+  useEffect(() => { onUploadFlowDoneRef.current = onUploadFlowDone; }, [onUploadFlowDone]);
 
   useEffect(() => {
     if (!videoUrl) {
@@ -62,16 +69,16 @@ const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded,
     const handleEnded = () => {
       setIsPlaying(false);
       isPlayingRef.current = false;
-      if (onEnded) onEnded();
+      if (onEndedRef.current) onEndedRef.current();
       handleVideoComplete();
     };
 
     const handlePlay = () => {
       setIsPlaying(true);
       isPlayingRef.current = true;
-      if (!playbackStartedRef.current && onPlay) {
+      if (!playbackStartedRef.current && onPlayRef.current) {
         playbackStartedRef.current = true;
-        onPlay();
+        onPlayRef.current();
       }
     };
 
@@ -127,7 +134,7 @@ const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded,
         clearTimeout(controlsTimerRef.current);
       }
     };
-  }, [videoUrl, autoPlay, onEnded, onPlay]);
+  }, [videoUrl, autoPlay]);
 
   useEffect(() => {
     const handleBeforeUnload = (e) => {
@@ -156,7 +163,7 @@ const VideoPlayer = ({ videoUrl, thumbnailUrl, title, autoPlay = false, onEnded,
       clearTimeout(controlsTimerRef.current);
     }
     
-    if (isPlaying) {
+    if (isPlayingRef.current) {
       controlsTimerRef.current = setTimeout(() => {
         setShowControls(false);
       }, 3000);

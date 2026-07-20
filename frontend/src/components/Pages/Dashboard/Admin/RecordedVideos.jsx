@@ -102,6 +102,7 @@ const RecordedVideos = () => {
       'completed': 'bg-green-600/20 text-green-300',
       'processing': 'bg-yellow-600/20 text-yellow-300',
       'failed': 'bg-red-600/20 text-red-300',
+      'pending': 'bg-blue-600/20 text-blue-300',
     };
     return `inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${colors[status] || 'bg-surface-600 text-gray-400'}`;
   };

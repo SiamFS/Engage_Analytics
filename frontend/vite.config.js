@@ -13,7 +13,7 @@ export default defineConfig({
     outDir: 'dist',
     minify: 'esbuild',
     esbuild: {
-      drop: ['console', 'debugger'],
+      drop: ['console.log', 'console.debug', 'console.info', 'console.warn', 'debugger'],
     },
   },
   server: {

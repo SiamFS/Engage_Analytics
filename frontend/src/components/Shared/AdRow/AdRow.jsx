@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
+import { X } from 'lucide-react';
 import { Button } from 'flowbite-react';
 import AdCard from '../AdCard/AdCard';
 import VideoPlayer from '../VideoPlayer/VideoPlayer';

@@ -70,14 +70,16 @@ const WebcamRecorder = forwardRef(({
   const faceTrackerRef = useRef(null);
   const facePreCheckTimerRef = useRef(null);
   const [pipPos, setPipPos] = useState({ x: 16, y: 72 });
+  const pipPosRef = useRef(pipPos);
+  pipPosRef.current = pipPos;
   const dragRef = useRef({ dragging: false, startX: 0, startY: 0, startPosX: 0, startPosY: 0 });
 
   const handlePipMouseDown = (e) => {
     dragRef.current.dragging = true;
     dragRef.current.startX = e.clientX;
     dragRef.current.startY = e.clientY;
-    dragRef.current.startPosX = pipPos.x;
-    dragRef.current.startPosY = pipPos.y;
+    dragRef.current.startPosX = pipPosRef.current.x;
+    dragRef.current.startPosY = pipPosRef.current.y;
     document.body.style.userSelect = 'none';
   };
 
@@ -101,7 +103,7 @@ const WebcamRecorder = forwardRef(({
       window.removeEventListener('mouseup', handleMouseUp);
       document.body.style.userSelect = '';
     };
-  }, [pipPos]);
+  }, []);
   const faceWasMetRef = useRef(true);
   const facePreCheckDoneRef = useRef(false);
   const handleFaceResultRef = useRef(null);
@@ -364,7 +366,7 @@ const WebcamRecorder = forwardRef(({
     }
   };
 
-  function handleFaceResult(result) {
+  const handleFaceResult = useCallback((result) => {
     if (!mountedRef.current) return;
 
     const criteria = result.faceCriteriaMet !== undefined ? result.faceCriteriaMet : true;
@@ -415,11 +417,11 @@ const WebcamRecorder = forwardRef(({
         if (onFaceBlockedChange) onFaceBlockedChange(true);
       }
     }
-  }
+  }, [dismissToast, addToast, onFaceBlockedChange]);
 
   useEffect(() => {
     handleFaceResultRef.current = handleFaceResult;
-  });
+  }, [handleFaceResult]);
 
   const initFaceTracker = async () => {
     try {
@@ -878,6 +880,7 @@ const WebcamRecorder = forwardRef(({
           if (chunksRef.current.length > 0) {
             const chunks = [...chunksRef.current];
             mediaRecorderRef.current.onstop = () => {
+              if (!mountedRef.current) return;
               const blob = new Blob(chunks, { type: 'video/webm' });
               if (blob.size > 0) {
                 uploadRecording(blob);

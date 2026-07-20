@@ -1,4 +1,3 @@
-import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 
 const WASM_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm';
 const MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
@@ -47,6 +46,7 @@ export class FaceTracker {
   async init() {
     this._hasWebGL = this._checkWebGL();
     try {
+      const { FaceLandmarker, FilesetResolver } = await import('@mediapipe/tasks-vision');
       const fileset = await FilesetResolver.forVisionTasks(WASM_BASE);
       this.faceLandmarker = await FaceLandmarker.createFromOptions(fileset, {
         baseOptions: {

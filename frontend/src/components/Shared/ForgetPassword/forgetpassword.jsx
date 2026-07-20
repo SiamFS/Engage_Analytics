@@ -1,6 +1,6 @@
 import React, { useState, useContext, useId, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { AuthContext } from '../../../contexts/AuthProvider/AuthProvider';
+import { AuthActionsContext } from '../../../contexts/AuthProvider/AuthProvider';
 import { motion, AnimatePresence } from 'framer-motion';
 import BrandLogo from '../Brandlogo/brandlogo';
 import { FormInput, SubmitButton } from '../Authcommon/FormElements';
@@ -43,7 +43,7 @@ SuccessMessage.propTypes = {
 };
 
 const ForgetPassword = () => {
-  const { resetPassword } = useContext(AuthContext);
+  const { resetPassword } = useContext(AuthActionsContext);
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);

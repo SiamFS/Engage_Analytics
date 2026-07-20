@@ -63,7 +63,7 @@ const navItemActiveClasses = "bg-brand-600 text-white hover:bg-brand-700";
 
 const DashboardSideNavbar = ({ isOpen, setIsOpen, isHovering, setIsHovering }) => {
   const { user } = useContext(AuthContext);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   const [imageError, setImageError] = useState(false);
 
   useEffect(() => {

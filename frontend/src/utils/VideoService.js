@@ -17,7 +17,7 @@ class VideoService {
 
   static CACHE_TTL_FEED = 60_000;
   static CACHE_TTL_DETAIL = 120_000;
-  static CACHE_TTL_ADMIN = 30_000;
+  static CACHE_TTL_ADMIN = 5_000;
 
   static _isFresh(timestamp, ttl) {
     return timestamp > 0 && (Date.now() - timestamp) < ttl;
@@ -53,7 +53,11 @@ class VideoService {
     }
     
     if (this._cache.inProgress.videoFeed) {
-      return await this._cache.inProgress.videoFeed;
+      try {
+        return await this._cache.inProgress.videoFeed;
+      } catch {
+        delete this._cache.inProgress.videoFeed;
+      }
     }
     
     console.log('Fetching public video feed...');
@@ -126,7 +130,11 @@ class VideoService {
     }
     
     if (this._cache.inProgress[`videoDetails_${videoId}`]) {
-      return await this._cache.inProgress[`videoDetails_${videoId}`];
+      try {
+        return await this._cache.inProgress[`videoDetails_${videoId}`];
+      } catch {
+        delete this._cache.inProgress[`videoDetails_${videoId}`];
+      }
     }
     
     console.log(`Fetching details for video ID: ${videoId}`);
@@ -680,6 +688,20 @@ class VideoService {
       throw new Error('Video ID is required to fetch my emotion data');
     }
     return await ApiService.get(`video/${videoId}/my-emotion/`);
+  }
+
+  /**
+   * Get related videos for a given video
+   * @param {string|number} videoId - ID of the video
+   * @param {number} limit - Maximum number of related videos
+   * @returns {Array} Related videos
+   */
+  static async getRelatedVideos(videoId, limit = 4) {
+    if (!videoId) {
+      throw new Error('Video ID is required to fetch related videos');
+    }
+    const response = await ApiService.get(`video/${videoId}/related/?limit=${limit}`);
+    return Array.isArray(response) ? response : [];
   }
   
   /**

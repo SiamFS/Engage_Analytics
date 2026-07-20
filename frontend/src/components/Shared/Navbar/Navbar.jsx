@@ -1,12 +1,13 @@
 import { useContext, useState, useEffect, useRef } from "react";
-import { AuthContext } from "../../../contexts/AuthProvider/AuthProvider";
+import { AuthContext, AuthActionsContext } from "../../../contexts/AuthProvider/AuthProvider";
 import { Link, useNavigate } from "react-router-dom";
 import { BarChart3, Menu, X, User } from "lucide-react";
 import SearchBar from "../SearchBar/SearchBar";
 import NotificationBell from "../NotificationBell/NotificationBell";
 
 const NavigationBar = () => {
-  const { user, logout } = useContext(AuthContext);
+  const { user } = useContext(AuthContext);
+  const { logout } = useContext(AuthActionsContext);
   const navigate = useNavigate();
   const [isScrolled, setIsScrolled] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);

@@ -16,6 +16,8 @@ class IsAdminOrReadOnly(permissions.BasePermission):
 
 class IsOwnerOrAdmin(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
+        if not request.user.is_authenticated:
+            return False
         if request.user.role == "admin":
             return True
         return obj.uploader == request.user

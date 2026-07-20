@@ -48,12 +48,12 @@ class User(AbstractBaseUser, PermissionsMixin):
         ("user", "User"),
     )
 
-    firebase_uid = models.CharField(max_length=128, unique=True, db_index=True)
-    email = models.EmailField(unique=True, db_index=True)
+    firebase_uid = models.CharField(max_length=128, unique=True)
+    email = models.EmailField(unique=True)
     phone_number = models.CharField(max_length=20, blank=True, null=True)
     first_name = models.CharField(max_length=50, blank=True)
     last_name = models.CharField(max_length=50, blank=True)
-    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default="user")
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default="user", db_index=True)
     date_joined = models.DateTimeField(default=timezone.now)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
@@ -120,7 +120,9 @@ class ViewerProfile(models.Model):
         return f"Profile for {self.user.email}"
 
     def calculate_points_value(self):
-        return self.points * 10  # 10 BDT per point
+        return self.points * ViewerProfile.POINTS_VALUE_RATE
+
+    POINTS_VALUE_RATE = 10  # BDT per point
 
 
 class Video(models.Model):
@@ -142,7 +144,7 @@ class Video(models.Model):
     upload_date = models.DateTimeField(auto_now_add=True, db_index=True)
     uploader = models.ForeignKey(User, on_delete=models.CASCADE, related_name="videos")
     views = models.PositiveIntegerField(default=0, validators=[MinValueValidator(0)], db_index=True)
-    likes = models.PositiveIntegerField(default=0, validators=[MinValueValidator(0)])
+    likes = models.PositiveIntegerField(default=0, validators=[MinValueValidator(0)], db_index=True)
     duration_seconds = models.FloatField(default=0.0, null=True, blank=True)
 
     # Fields for view limiting and expiry
@@ -350,9 +352,10 @@ class VideoView(models.Model):
 
     class Meta:
         db_table = "video_views"
+        unique_together = ("video", "viewer")
         indexes = [
-            models.Index(fields=["video", "viewer"]),
             models.Index(fields=["viewed_at"]),
+            models.Index(fields=["viewer", "-viewed_at"]),
         ]
 
     def __str__(self):
@@ -371,6 +374,9 @@ class VideoLike(models.Model):
     class Meta:
         db_table = "video_likes"
         unique_together = ("video", "user")
+        indexes = [
+            models.Index(fields=["user", "-liked_at"]),
+        ]
 
     def __str__(self):
         return f"{self.user.email} liked {self.video.title}"
@@ -431,7 +437,7 @@ class WebcamRecording(models.Model):
     points_awarded = models.BooleanField(default=False)
     liveness_data = models.JSONField(default=dict, blank=True)
     liveness_passed = models.BooleanField(default=False)
-    liveness_score = models.FloatField(null=True, blank=True)
+    liveness_score = models.FloatField(null=True, blank=True, validators=[MinValueValidator(0.0), MaxValueValidator(1.0)])
 
     class Meta:
         ordering = ["-recording_date"]
@@ -440,6 +446,7 @@ class WebcamRecording(models.Model):
         indexes = [
             models.Index(fields=["upload_status", "analysis_status"]),
             models.Index(fields=["recorder", "-recording_date"]),
+            models.Index(fields=["video", "upload_status"]),
         ]
 
     def __str__(self):
@@ -456,7 +463,7 @@ class EmotionFrame(models.Model):
         Video, on_delete=models.CASCADE, related_name="emotion_frames"
     )
     viewer = models.ForeignKey(User, on_delete=models.CASCADE, related_name="emotion_frame_viewer")
-    t_seconds = models.FloatField()
+    t_seconds = models.FloatField(validators=[MinValueValidator(0.0)])
     angry = models.FloatField(default=0.0, validators=[MinValueValidator(0.0), MaxValueValidator(1.0)])
     disgust = models.FloatField(default=0.0, validators=[MinValueValidator(0.0), MaxValueValidator(1.0)])
     fear = models.FloatField(default=0.0, validators=[MinValueValidator(0.0), MaxValueValidator(1.0)])
@@ -465,7 +472,7 @@ class EmotionFrame(models.Model):
     sad = models.FloatField(default=0.0, validators=[MinValueValidator(0.0), MaxValueValidator(1.0)])
     surprise = models.FloatField(default=0.0, validators=[MinValueValidator(0.0), MaxValueValidator(1.0)])
     dominant = models.CharField(max_length=20)
-    confidence = models.FloatField(default=0.0)
+    confidence = models.FloatField(default=0.0, validators=[MinValueValidator(0.0), MaxValueValidator(1.0)])
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -654,7 +661,7 @@ class FeedbackResponse(models.Model):
         Video, on_delete=models.SET_NULL, null=True, blank=True, related_name="feedback_responses"
     )
     responses = models.JSONField(default=dict)
-    rating = models.PositiveSmallIntegerField(null=True, blank=True)
+    rating = models.PositiveSmallIntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(5)])
     is_anonymous = models.BooleanField(default=False)
     is_bug_report = models.BooleanField(default=False)
     consent_to_improve = models.BooleanField(default=False)
@@ -667,8 +674,8 @@ class FeedbackResponse(models.Model):
     class Meta:
         db_table = "feedback_responses"
         ordering = ["-submitted_at"]
+        unique_together = ("user", "video")
         indexes = [
-            models.Index(fields=["user", "video"]),
             models.Index(fields=["-submitted_at"]),
         ]
 

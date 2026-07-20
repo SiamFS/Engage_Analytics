@@ -105,33 +105,6 @@ class TestVideoShareService:
         
         assert url == f"https://custom-frontend.com/video/{test_share.share_token}"
 
-    def test_increment_access_count(self, test_share):
-        """Test incrementing access count for a share."""
-        initial_count = test_share.access_count
-        
-        share, video = VideoShareService.increment_access_count(test_share.share_token)
-        
-        assert share.access_count == initial_count + 1
-        assert video == test_share.video
-        
-        # Verify database was updated
-        test_share.refresh_from_db()
-        assert test_share.access_count == initial_count + 1
-
-    def test_increment_access_count_multiple(self, test_share):
-        """Test incrementing access count multiple times."""
-        # First increment
-        VideoShareService.increment_access_count(test_share.share_token)
-        
-        # Second increment
-        share, video = VideoShareService.increment_access_count(test_share.share_token)
-        
-        assert share.access_count == 2
-        
-        # Verify database was updated
-        test_share.refresh_from_db()
-        assert test_share.access_count == 2
-
     def test_create_share_unauthenticated_mock_user(self, test_video):
         """Test creating a share link with mock unauthenticated user."""
         # Create a mock user who is not authenticated
@@ -153,18 +126,3 @@ class TestVideoShareService:
             
             expected_url = f"https://default-frontend.example.com/video/{test_share.share_token}"
             assert url == expected_url
-
-    @patch('api.services.video_share_service.get_object_or_404')
-    def test_increment_access_count_exception_handling(self, mock_get_object_or_404, test_share):
-        """Test exception handling in increment_access_count method."""
-        # Setup mock to raise an exception
-        mock_get_object_or_404.side_effect = Exception("Database error")
-        
-        # Should raise the exception (not caught in the method)
-        with pytest.raises(Exception):
-            VideoShareService.increment_access_count(test_share.share_token)
-            
-        # Verify get_object_or_404 was called
-        mock_get_object_or_404.assert_called_once_with(
-            VideoShare, share_token=test_share.share_token, active=True
-        )

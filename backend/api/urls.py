@@ -24,6 +24,7 @@ from api.views import (
     VideoEmotionSummaryView,
     VideoEmotionRecordingsView,
     MyEmotionView,
+    VideoRelatedView,
     UserWebcamRecordingsView,
     UserProfileView,
     UserDeviceView,
@@ -187,6 +188,11 @@ urlpatterns = [
         "video/<int:video_id>/my-emotion/",
         MyEmotionView.as_view(),
         name="video-my-emotion",
+    ),
+    path(
+        "video/<int:video_id>/related/",
+        VideoRelatedView.as_view(),
+        name="video-related",
     ),
     # Notification endpoints
     path(

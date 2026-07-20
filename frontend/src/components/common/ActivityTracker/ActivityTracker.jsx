@@ -1,23 +1,19 @@
 import { useContext, useEffect } from 'react';
-import { AuthContext } from '../../../contexts/AuthProvider/AuthProvider';
+import { AuthContext, AuthActionsContext } from '../../../contexts/AuthProvider/AuthProvider';
 
 /**
  * Component that tracks user activity and automatically extends the session
  * This component doesn't render anything visible
  */
 const ActivityTracker = () => {
-  const { user, extendSession } = useContext(AuthContext);
+  const { user } = useContext(AuthContext);
+  const { extendSession } = useContext(AuthActionsContext);
   
   useEffect(() => {
     if (!user) return; // Only track activity when user is logged in
     
     // Define the user actions that count as activity
-    const activityEvents = [
-      'mousedown',
-      'keydown',
-      'scroll',
-      'touchstart'
-    ];
+    const activityEvents = ['mousedown', 'keydown'];
     
     // Track last activity time
     let lastActivityTime = Date.now();

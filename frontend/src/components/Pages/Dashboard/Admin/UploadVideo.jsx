@@ -394,7 +394,7 @@ const UploadVideo = () => {
       updateProgressWithDelay(1, 'Uploading video...');
       
       await VideoService.uploadFileToBlob(uploadUrls.videoUrl, videoFile, (progress) => {
-        updateProgressWithDelay(Math.min(Math.floor(progress * 70), 70), `Uploading video...`);
+        updateProgressWithDelay(Math.min(Math.floor(progress * 0.7), 70), `Uploading video...`);
       });
 
       updateProgressWithDelay(70, 'Video upload complete. Preparing thumbnail...');
@@ -404,7 +404,7 @@ const UploadVideo = () => {
       setStatusMessage(`Uploading thumbnail: ${thumbnailToUpload.name}...`);
       
       await VideoService.uploadFileToBlob(uploadUrls.thumbnailUrl, thumbnailToUpload, (progress) => {
-        updateProgressWithDelay(70 + Math.min(Math.floor(progress * 30), 30), `Uploading thumbnail...`);
+        updateProgressWithDelay(70 + Math.min(Math.floor(progress * 0.3), 30), `Uploading thumbnail...`);
       });
 
       setUploadProgress(100);

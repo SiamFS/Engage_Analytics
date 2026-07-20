@@ -74,9 +74,7 @@ const SearchBar = ({
   }, [searchQuery]);
   
   useEffect(() => {
-    if (searchHistory.length > 0) {
-      localStorage.setItem('searchHistory', JSON.stringify(searchHistory));
-    }
+    localStorage.setItem('searchHistory', JSON.stringify(searchHistory));
   }, [searchHistory]);
   
   const loadSearchHistory = () => {
@@ -105,37 +103,25 @@ const SearchBar = ({
     setIsCategoriesLoading(true);
     
     try {
-      const recommendationsResponse = await ApiService.get('recommendations/?limit=5');
+      const [recRes, trendRes, recentRes] = await Promise.allSettled([
+        ApiService.get('recommendations/?limit=5'),
+        ApiService.get('trending-videos/?limit=10'),
+        ApiService.get('recent-videos/?limit=10'),
+      ]);
       
       const categories = new Set();
-      if (Array.isArray(recommendationsResponse)) {
-        recommendationsResponse.forEach(video => {
-          if (video.category?.trim()) {
-            categories.add(video.category.trim());
-          }
-        });
-      }
-      
-      if (categories.size < 3) {
-        const trendingResponse = await ApiService.get('trending-videos/?limit=10');
-        if (Array.isArray(trendingResponse)) {
-          trendingResponse.forEach(video => {
+      [recRes, trendRes, recentRes].forEach(res => {
+        if (res.status === 'fulfilled' && Array.isArray(res.value)) {
+          res.value.forEach(video => {
             if (video.category?.trim()) {
               categories.add(video.category.trim());
             }
           });
         }
-      }
+      });
       
-      if (categories.size < MAX_CATEGORY_TILES) {
-        const recentResponse = await ApiService.get('recent-videos/?limit=10');
-        if (Array.isArray(recentResponse)) {
-          recentResponse.forEach(video => {
-            if (video.category?.trim()) {
-              categories.add(video.category.trim());
-            }
-          });
-        }
+      if (categories.size === 0) {
+        throw new Error("No categories found");
       }
       
       setRecommendedCategories(Array.from(categories).slice(0, MAX_CATEGORY_TILES));
@@ -152,7 +138,7 @@ const SearchBar = ({
     setIsLoading(true);
     
     try {
-      const allVideos = await Promise.resolve(VideoService.getVideoFeed());
+      const allVideos = await VideoService.getVideoFeed();
       
       if (Array.isArray(allVideos)) {
         const processedSuggestions = generateSuggestions(allVideos, query);

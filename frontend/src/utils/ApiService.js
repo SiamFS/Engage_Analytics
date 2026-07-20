@@ -257,6 +257,7 @@ const ApiService = {
     };
     
     console.log('Retrying request with new token...');
+    this._clearSignal(endpoint);
     return this.request(endpoint, newConfig, adminCredentials);
   },
 

@@ -64,7 +64,7 @@ const EditVideo = () => {
         setError(null);
         fetchAttempted.current = true;
         
-        const videoData = await Promise.resolve(VideoService.getVideoDetails(id));
+        const videoData = await VideoService.getVideoDetails(id);
         
         if (videoData && isMounted.current) {
           setVideo(videoData);
@@ -302,12 +302,12 @@ const EditVideo = () => {
              
           <div className="flex justify-between pt-4 border-t border-elevated-border">
             <Button
-              color="failure"
+              color="light"
               outline
               onClick={() => navigate(`/video/${id}`)}
               type="button"
             >
-              Delete Video
+              View Video
             </Button>
             
             <Button

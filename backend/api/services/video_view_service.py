@@ -44,8 +44,10 @@ class VideoViewService:
         """Increment the view count for a video"""
         video.views = F("views") + 1
         video.save(update_fields=["views"])
-        video.refresh_from_db()
-        return video.views
+        if video.view_limit:
+            video.refresh_from_db()
+            return video.views
+        return Video.objects.filter(id=video.id).values_list("views", flat=True).first() or 0
     
     @staticmethod
     def record_user_view(video, user):

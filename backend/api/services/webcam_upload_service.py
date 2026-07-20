@@ -164,7 +164,11 @@ class WebcamUploadService:
                 )
                 recording.upload_status = "completed"
                 recording.upload_completed_at = timezone.now()
-                recording.save(update_fields=["upload_status", "upload_completed_at"])
+                if not recording.points_awarded:
+                    from api.services import PointsService
+                    PointsService.award_points_for_webcam_upload(user)
+                    recording.points_awarded = True
+                recording.save(update_fields=["upload_status", "upload_completed_at", "points_awarded"])
         except WebcamRecording.DoesNotExist:
             return None
 
@@ -187,8 +191,15 @@ class WebcamUploadService:
             import time
             from django.db import close_old_connections
             try:
-                time.sleep(3)
-                WebcamUploadService.generate_thumbnail(recording_id)
+                for delay in [0.5, 1.0, 2.0, 4.0]:
+                    time.sleep(delay)
+                    try:
+                        WebcamUploadService.generate_thumbnail(recording_id)
+                        break
+                    except Exception:
+                        pass
+                else:
+                    WebcamUploadService.generate_thumbnail(recording_id)
             except Exception:
                 logger.exception(f"Background thumbnail generation failed for recording {recording_id}")
             finally:

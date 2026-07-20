@@ -41,7 +41,7 @@ class VideoLikeService:
         """Add a like to a video"""
         video.likes = F("likes") + 1
         video.save(update_fields=["likes"])
-        video.refresh_from_db()
+        likes_count = Video.objects.filter(id=video.id).values_list("likes", flat=True).first() or 0
 
         if like.user_id and video.uploader_id != like.user_id:
             liker_name = like.user.get_full_name() or like.user.email if like.user else "Someone"
@@ -53,7 +53,7 @@ class VideoLikeService:
                 data={"video_id": video.id, "liker_id": like.user_id},
             )
 
-        return video, True, video.likes
+        return video, True, likes_count
     
     @staticmethod
     def remove_like(video, like):
@@ -61,5 +61,5 @@ class VideoLikeService:
         like.delete()
         video.likes = F("likes") - 1
         video.save(update_fields=["likes"])
-        video.refresh_from_db()
-        return video, False, video.likes
+        likes_count = Video.objects.filter(id=video.id).values_list("likes", flat=True).first() or 0
+        return video, False, likes_count

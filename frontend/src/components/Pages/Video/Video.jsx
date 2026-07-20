@@ -183,20 +183,14 @@ const Video = () => {
   }, [fetchVideoData]);
   
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const searchParam = params.get('q');
-    if (searchParam !== searchQuery) {
-      setSearchQuery(searchParam || '');
-    }
-  }, [location.search]);
-  
-  useEffect(() => {
     if (videos.length === 0) return;
+    
+    const urlParams = new URLSearchParams(location.search);
+    const query = (urlParams.get('q') || '').toLowerCase();
     
     let results = [...videos];
     
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
+    if (query) {
       results = results.filter(video => 
         (video.title && video.title.toLowerCase().includes(query)) ||
         (video.description && video.description.toLowerCase().includes(query)) ||
@@ -256,12 +250,12 @@ const Video = () => {
     if (sortOption && sortOption !== 'newest') params.set('sort', sortOption);
     if (categoryFilter) params.set('category', categoryFilter);
     if (typeFilter) params.set('type', typeFilter);
-    if (searchQuery) params.set('q', searchQuery);
+    if (query) params.set('q', query);
     
     const newUrl = location.pathname + (params.toString() ? `?${params.toString()}` : '');
     window.history.replaceState({}, '', newUrl);
     
-  }, [videos, sortOption, categoryFilter, typeFilter, searchQuery, location.pathname, navigate]);
+  }, [videos, sortOption, categoryFilter, typeFilter, location.search, location.pathname, navigate]);
   
   const loadMoreVideos = () => {
     if (!hasMore || loadingMore || filteredVideos.length === 0) return;

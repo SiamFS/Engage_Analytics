@@ -20,6 +20,7 @@ import VideoService from '../../utils/VideoService';
 import ApiService from '../../utils/ApiService';
 
 export const AuthContext = createContext();
+export const AuthActionsContext = createContext();
 const googleProvider = new GoogleAuthProvider();
 
 const DEFAULT_AVATAR = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-7 8-7s8 3 8 7"/></svg>');
@@ -490,39 +491,21 @@ const AuthProvider = ({ children }) => {
     return () => unsubscribe();
   }, []);
   
-  // Force check on initial load
+  const handleBackNavigation = useCallback(() => {
+    if (auth.currentUser) {
+      const authPaths = ['/login', '/signup', '/forgetpassword'];
+      if (authPaths.some(path => window.location.pathname.includes(path))) {
+        window.location.replace('/');
+      }
+    }
+  }, []);
+
   useEffect(() => {
-    const checkCurrentAuthState = async () => {
-      if (auth.currentUser) {
-        try {
-          const token = await auth.currentUser.getIdToken(true);
-          TokenService.setToken(token, auth.currentUser.uid);
-        } catch (error) {
-          console.error('Error refreshing token on initial load:', error);
-        }
-      }
-    };
-    
-    checkCurrentAuthState();
-    
-    const handleBackNavigation = () => {
-      if (auth.currentUser) {
-        const authPaths = ['/login', '/signup', '/forgetpassword'];
-        const currentPath = window.location.pathname;
-        
-        if (authPaths.some(path => currentPath.includes(path))) {
-          console.log('Detected back navigation to auth page while logged in');
-          window.location.replace('/');
-        }
-      }
-    };
-    
     window.addEventListener('popstate', handleBackNavigation);
-    
     return () => {
       window.removeEventListener('popstate', handleBackNavigation);
     };
-  }, []);
+  }, [handleBackNavigation]);
 
   const safeGetGoogleAuthCache = useCallback(() => {
     try {
@@ -537,6 +520,12 @@ const AuthProvider = ({ children }) => {
     user,
     loading,
     deviceError,
+    sessionExpiring,
+    sessionTimeRemaining,
+    googleAuthChecked,
+  }), [user, loading, deviceError, sessionExpiring, sessionTimeRemaining, googleAuthChecked]);
+
+  const actionsValue = useMemo(() => ({
     createUser,
     login,
     logout,
@@ -546,15 +535,20 @@ const AuthProvider = ({ children }) => {
     removeDevice,
     getUserDevices,
     maxDevices: TokenService.maxDevices,
-    sessionExpiring,
-    sessionTimeRemaining,
     extendSession,
     checkSession,
-    googleAuthChecked,
-    getGoogleAuthCache: safeGetGoogleAuthCache 
-  }), [user, loading, deviceError, sessionExpiring, sessionTimeRemaining, extendSession, checkSession, googleAuthChecked, safeGetGoogleAuthCache]);
+    getGoogleAuthCache: safeGetGoogleAuthCache,
+  }), [createUser, login, logout, signInWithGoogle, linkAccounts,
+      resetPassword, removeDevice, getUserDevices,
+      extendSession, checkSession, safeGetGoogleAuthCache]);
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      <AuthActionsContext.Provider value={actionsValue}>
+        {children}
+      </AuthActionsContext.Provider>
+    </AuthContext.Provider>
+  );
 };
 
 AuthProvider.propTypes = {

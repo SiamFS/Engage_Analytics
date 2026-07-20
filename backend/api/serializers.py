@@ -75,7 +75,7 @@ class UserSerializer(serializers.ModelSerializer):
             "photo_url",
             "devices",
         ]
-        read_only_fields = ["firebase_uid", "is_active", "date_joined"]
+        read_only_fields = ["firebase_uid", "is_active", "date_joined", "role"]
 
 
 class AdminActionSerializer(serializers.Serializer):
@@ -163,6 +163,9 @@ class VideoDetailSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_is_liked(self, obj):
+        liked_ids = self.context.get("liked_video_ids")
+        if liked_ids is not None:
+            return obj.id in liked_ids
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             return VideoLike.objects.filter(video=obj, user=request.user).exists()
@@ -333,6 +336,8 @@ class NotificationSerializer(serializers.ModelSerializer):
         from django.utils import timezone
         now = timezone.now()
         diff = now - dt
+        if diff.total_seconds() < 0:
+            return "just now"
         if diff.days > 0:
             return f"{diff.days}d ago"
         hours = diff.seconds // 3600

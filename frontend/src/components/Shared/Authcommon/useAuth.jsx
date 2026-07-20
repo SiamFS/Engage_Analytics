@@ -1,6 +1,6 @@
 import { useState, useContext, useCallback, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { AuthContext } from '../../../contexts/AuthProvider/AuthProvider';
+import { AuthActionsContext } from '../../../contexts/AuthProvider/AuthProvider';
 
 const useAuthNavigation = () => {
   const navigate = useNavigate();
@@ -41,7 +41,7 @@ const useAuthNavigation = () => {
 };
 
 export const useGoogleAuth = () => {
-  const { signInWithGoogle, maxDevices, getGoogleAuthCache, googleAuthChecked } = useContext(AuthContext);
+  const { signInWithGoogle, maxDevices, getGoogleAuthCache, googleAuthChecked } = useContext(AuthActionsContext);
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState('');
   const [cachedGoogleAccount, setCachedGoogleAccount] = useState(null);
@@ -109,7 +109,7 @@ export const useGoogleAuth = () => {
 };
 
 export const useLoginForm = () => {
-  const { login, maxDevices } = useContext(AuthContext);
+  const { login, maxDevices } = useContext(AuthActionsContext);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -168,7 +168,7 @@ export const useLoginForm = () => {
 };
 
 export const useSignupForm = () => {
-  const { createUser, maxDevices } = useContext(AuthContext);
+  const { createUser, maxDevices } = useContext(AuthActionsContext);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',

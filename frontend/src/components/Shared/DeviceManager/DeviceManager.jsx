@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import PropTypes from 'prop-types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AuthContext } from '../../../contexts/AuthProvider/AuthProvider';
+import { AuthContext, AuthActionsContext } from '../../../contexts/AuthProvider/AuthProvider';
 import { ErrorMessage } from '../../common/ErrorMessage/ErrorMessage';
 import { Smartphone, Laptop, Trash2, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -308,7 +308,8 @@ const formatLastActive = (dateString) => {
 const MAX_DISPLAY_DEVICES = 5;
 
 const DeviceManager = () => {
-  const { getUserDevices, removeDevice, maxDevices, user } = useContext(AuthContext);
+  const { user } = useContext(AuthContext);
+  const { getUserDevices, removeDevice, maxDevices } = useContext(AuthActionsContext);
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

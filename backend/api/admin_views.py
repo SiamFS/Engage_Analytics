@@ -111,6 +111,8 @@ class PromoteToAdminView(generics.CreateAPIView):
                 }
             )
 
+        except Http404:
+            raise
         except Exception as e:
             error_str = str(e).lower()
             if "firebase" in error_str or "auth" in error_str:
@@ -286,7 +288,7 @@ class AdminPointsView(generics.GenericAPIView):
             "total": total,
             "total_users": total,
             "total_points": total_points,
-            "total_points_value": total_points * 10,
+            "total_points_value": total_points * ViewerProfile.POINTS_VALUE_RATE,
         })
 
 
@@ -320,7 +322,7 @@ class AdminUploadRequestDetailView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
 
     def get(self, request, request_id):
-        upload_request = UploadRequestService.get_request_detail(request_id)
+        upload_request = UploadRequestService.get_request_detail(request_id, request.user)
         if not upload_request:
             return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -332,7 +334,7 @@ class AdminUploadRequestApproveView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
 
     def post(self, request, request_id):
-        upload_request = UploadRequestService.get_request_detail(request_id)
+        upload_request = UploadRequestService.get_request_detail(request_id, request.user)
         if not upload_request:
             return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -355,7 +357,7 @@ class AdminUploadRequestRejectView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
 
     def post(self, request, request_id):
-        upload_request = UploadRequestService.get_request_detail(request_id)
+        upload_request = UploadRequestService.get_request_detail(request_id, request.user)
         if not upload_request:
             return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -380,7 +382,7 @@ class AdminUploadRequestArchiveView(APIView):
     permission_classes = [IsAuthenticated, IsAdmin]
 
     def post(self, request, request_id):
-        upload_request = UploadRequestService.get_request_detail(request_id)
+        upload_request = UploadRequestService.get_request_detail(request_id, request.user)
         if not upload_request:
             return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -593,6 +595,8 @@ class AdminUserBulkActionView(APIView):
                 {"detail": "action and user_ids are required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        user_ids = [uid for uid in user_ids if uid != request.user.id]
 
         if action == "activate":
             users = User.objects.filter(id__in=user_ids)

@@ -59,5 +59,6 @@ class FeedbackService:
             "average_rating": avg_rating,
             "rating_distribution": rating_dist,
             "completion_rate": completion_rate,
+            "bug_report_count": base.filter(is_bug_report=True).count(),
             "recent_trend": recent_trend,
         }

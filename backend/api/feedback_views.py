@@ -235,46 +235,12 @@ class FeedbackAnalyticsView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated, IsAdmin]
 
     def get(self, request):
+        from api.services.feedback_service import FeedbackService
+
+        data = FeedbackService.calculate_analytics()
         base = FeedbackResponse.objects.all()
         total = base.count()
-
-        agg = base.aggregate(
-            avg_rating=Avg("rating"),
-        )
-        avg_rating = round(agg["avg_rating"], 2) if agg["avg_rating"] else 0.0
-
-        rating_dist = {}
-        for i in range(1, 6):
-            rating_dist[str(i)] = base.filter(rating=i).count()
-
-        completed = base.filter(completed_at__isnull=False).count()
-        completion_rate = round(completed / total * 100, 1) if total else 0.0
-
         consent_count = base.filter(consent_to_improve=True).count()
-        consent_rate = round(consent_count / total * 100, 1) if total else 0.0
+        data["consent_rate"] = round(consent_count / total * 100, 1) if total else 0.0
 
-        from django.db.models.functions import TruncDate
-        trend_qs = (
-            base.annotate(date=TruncDate("submitted_at"))
-            .values("date")
-            .annotate(count=Count("id"), avg_rating=Avg("rating"))
-            .order_by("-date")[:30]
-        )
-        recent_trend = [
-            {
-                "date": str(item["date"]),
-                "count": item["count"],
-                "avg_rating": round(item["avg_rating"], 2) if item["avg_rating"] else 0,
-            }
-            for item in trend_qs
-        ]
-
-        data = {
-            "total_responses": total,
-            "average_rating": avg_rating,
-            "rating_distribution": rating_dist,
-            "completion_rate": completion_rate,
-            "consent_rate": consent_rate,
-            "recent_trend": recent_trend,
-        }
         return Response(data)

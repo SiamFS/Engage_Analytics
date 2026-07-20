@@ -1,59 +1,47 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { AuthContext } from '../../../contexts/AuthProvider/AuthProvider';
+import { AuthContext, AuthActionsContext } from '../../../contexts/AuthProvider/AuthProvider';
 import { X } from 'lucide-react';
 
-/**
- * Formats milliseconds into a user-friendly time string (minutes:seconds)
- * @param {number} ms - Time in milliseconds
- * @returns {string} Formatted time string
- */
 const formatTimeRemaining = (ms) => {
   if (!ms) return '0:00';
-  
   const totalSeconds = Math.floor(ms / 1000);
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
-  
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 };
 
 const SessionTimeoutHandler = () => {
-  const { 
-    user, 
-    sessionExpiring, 
-    sessionTimeRemaining, 
-    extendSession, 
-    logout 
-  } = useContext(AuthContext);
+  const { user, sessionExpiring, sessionTimeRemaining } = useContext(AuthContext);
+  const { extendSession, logout } = useContext(AuthActionsContext);
   
   const [timeDisplay, setTimeDisplay] = useState('');
+  const [dismissed, setDismissed] = useState(false);
+  const startTimeRef = useRef(Date.now());
+  const initialRemainingRef = useRef(sessionTimeRemaining);
   
-  // Update the countdown timer
   useEffect(() => {
     if (!sessionExpiring || !sessionTimeRemaining) {
       setTimeDisplay('');
+      setDismissed(false);
       return;
     }
     
+    startTimeRef.current = Date.now();
+    initialRemainingRef.current = sessionTimeRemaining;
     setTimeDisplay(formatTimeRemaining(sessionTimeRemaining));
+    setDismissed(false);
     
-    // Update the timer every second
     const intervalId = setInterval(() => {
-      if (sessionTimeRemaining <= 0) {
-        clearInterval(intervalId);
-        return;
-      }
-      
-      const newRemaining = sessionTimeRemaining - 1000;
-      setTimeDisplay(formatTimeRemaining(Math.max(0, newRemaining)));
+      const elapsed = Date.now() - startTimeRef.current;
+      const remaining = Math.max(0, initialRemainingRef.current - elapsed);
+      setTimeDisplay(formatTimeRemaining(remaining));
     }, 1000);
     
     return () => clearInterval(intervalId);
   }, [sessionExpiring, sessionTimeRemaining]);
   
-  // If no user or not expiring, don't show anything
-  if (!user || !sessionExpiring) {
+  if (dismissed || !user || !sessionExpiring) {
     return null;
   }
   
@@ -101,7 +89,7 @@ const SessionTimeoutHandler = () => {
               <div className="ml-4 flex-shrink-0 flex">
                 <button
                   className="inline-flex text-gray-400 hover:text-gray-500"
-                  onClick={() => {}}
+                  onClick={() => setDismissed(true)}
                 >
                   <span className="sr-only">Close</span>
                   <X className="h-5 w-5" />

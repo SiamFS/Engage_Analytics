@@ -71,6 +71,8 @@ class FirebaseAuthentication(authentication.BaseAuthentication):
         elif role == "user":
             from api.models import ViewerProfile
             ViewerProfile.objects.create(user=user)
+        from api.models import UserNotificationPreference
+        UserNotificationPreference.objects.get_or_create(user=user)
 
     def _get_or_create_user(self, decoded_token):
         uid = decoded_token.get("uid", "")
